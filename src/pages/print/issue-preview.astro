@@ -1,0 +1,380 @@
+---
+import Header from '../../components/Header.astro';
+import ArticleCard from '../../components/ArticleCard.astro';
+import { getArticles } from '../../lib/db';
+import { generateQrDataUrl } from '../../lib/qr';
+import '../../styles/global.css';
+
+export const prerender = false;
+
+// 1. Obtener artículos seleccionados para el fanzine (o fallback a publicados)
+let allSelected = await getArticles({ selectedForPrint: true });
+if (allSelected.length === 0) {
+  allSelected = await getArticles({ status: 'published' });
+}
+
+// Ordenar por printOrder ascendente
+allSelected.sort((a, b) => (a.printOrder || 1) - (b.printOrder || 1));
+
+// 2. Clasificar en las 3 categorías requeridas: Destacado, Portada, Interior
+let destacadoArticles = allSelected.filter(a => a.fanzineCategory === 'destacado');
+let portadaArticles = allSelected.filter(a => a.fanzineCategory === 'portada');
+let interiorArticles = allSelected.filter(a => a.fanzineCategory === 'interior' || a.includeInInterior);
+
+// Si no se asignó un Destacado explícito:
+if (destacadoArticles.length === 0 && allSelected.length > 0) {
+  // Tomar un artículo que no esté en portadaArticles para no reducir la selección de portada
+  const candidate = allSelected.find(a => !portadaArticles.some(p => p.id === a.id));
+  if (candidate) {
+    destacadoArticles = [candidate];
+  } else if (portadaArticles.length > 0) {
+    destacadoArticles = [portadaArticles[0]];
+    portadaArticles = portadaArticles.slice(1);
+  } else {
+    destacadoArticles = [allSelected[0]];
+  }
+}
+
+// Fallback para portada cuando no hay selección previa:
+if (portadaArticles.length === 0 && allSelected.length > 1) {
+  portadaArticles = allSelected.filter(a => a.id !== destacadoArticles[0]?.id).slice(0, 3);
+}
+
+// Fallback para interior si no hay ninguno marcado:
+if (interiorArticles.length === 0) {
+  const coveredIds = new Set([...destacadoArticles.map(a => a.id), ...portadaArticles.map(a => a.id)]);
+  interiorArticles = allSelected.filter(a => !coveredIds.has(a.id));
+  if (interiorArticles.length === 0) {
+    interiorArticles = allSelected;
+  }
+}
+
+// Generar códigos QR para fuentes originales
+const qrMap = new Map<string, string>();
+for (const art of allSelected) {
+  if (art.sourceUrl) {
+    const qr = await generateQrDataUrl(art.sourceUrl);
+    qrMap.set(art.id, qr);
+  }
+}
+
+const mainDestacado = destacadoArticles[0];
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>La Parte Arrendataria — Vista de Impresión Fanzine</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Playfair+Display:ital,wght@0,700;0,900;1,400;1,700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* Simulación de hojas físicas A4 en pantalla */
+      @media screen {
+        body {
+          background-color: #4a4a4a;
+          padding: 20px 0;
+        }
+        .sheet-container {
+          background: #ffffff;
+          width: 210mm;
+          min-height: 297mm;
+          margin: 0 auto 30px auto;
+          padding: 10mm 12mm 15mm 12mm;
+          box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+          box-sizing: border-box;
+          position: relative;
+        }
+      }
+
+      /* Reglas estrictas de impresión A4 */
+      @media print {
+        @page {
+          size: A4 portrait;
+          margin: 10mm 10mm 12mm 10mm;
+        }
+        body {
+          background: #ffffff !important;
+          padding: 0 !important;
+          font-size: 8.25pt !important;
+          line-height: 1.32 !important;
+        }
+        .sheet-container {
+          width: 100% !important;
+          padding: 0 !important;
+          box-shadow: none !important;
+          margin: 0 !important;
+          min-height: 0 !important;
+        }
+        .fanzine-portada-page {
+          height: 274mm !important;
+          max-height: 274mm !important;
+          overflow: hidden !important;
+          page-break-after: always !important;
+          break-after: page !important;
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+          display: flex !important;
+          flex-direction: column !important;
+          justify-content: space-between !important;
+        }
+        .fanzine-interior-page {
+          page-break-before: always !important;
+          break-before: page !important;
+        }
+      }
+
+      /* Layout Portada: 2 Columnas asimétricas (Ancha para Destacado, Estrecha para Portada) */
+      .fanzine-portada-grid {
+        display: flex;
+        gap: 6mm;
+        align-items: flex-start;
+        margin-top: 6px;
+        flex: 1;
+      }
+
+      .fanzine-destacado-col {
+        flex: 1.85;
+        min-width: 0;
+      }
+
+      .fanzine-portada-secondary-col {
+        flex: 1.15;
+        min-width: 0;
+        border-left: 2px solid #000000;
+        padding-left: 5mm;
+      }
+
+      /* Flujo continuo de 3 columnas para páginas interiores */
+      .fanzine-editorial-flow {
+        column-count: 3;
+        column-gap: 5mm;
+        column-rule: 1px solid #111111;
+        text-align: justify;
+        hyphens: auto;
+      }
+
+      /* Tipografía compacta de cuerpo */
+      .fanzine-editorial-flow :global(.prose) {
+        font-size: 8.25pt !important;
+        line-height: 1.32 !important;
+      }
+
+      .fanzine-editorial-flow :global(.prose p) {
+        font-size: 8.25pt !important;
+        line-height: 1.32 !important;
+        margin-top: 0 !important;
+        margin-bottom: 0.45rem !important;
+        text-align: justify !important;
+        text-justify: inter-word !important;
+        hyphens: auto !important;
+        text-wrap: pretty !important;
+      }
+
+      /* Titulares sin espacios gigantescos: alineados a la izquierda y balanceados */
+      .fanzine-article-header h2,
+      .fanzine-editorial-flow :global(h1),
+      .fanzine-editorial-flow :global(h2),
+      .fanzine-editorial-flow :global(h3),
+      .fanzine-editorial-flow :global(h4),
+      .fanzine-editorial-flow :global(.fanzine-article-header h2) {
+        text-align: left !important;
+        text-wrap: balance !important;
+        hyphens: manual !important;
+        word-spacing: normal !important;
+      }
+
+      /* Flujo continuo: los artículos se conectan directamente en la misma columna */
+      .fanzine-article-block {
+        break-inside: auto !important;
+        page-break-inside: auto !important;
+        margin-bottom: 1.25rem !important;
+        padding-bottom: 1rem !important;
+        border-bottom: 2px dashed #444444 !important;
+      }
+
+      .fanzine-article-block:last-child {
+        border-bottom: none !important;
+      }
+
+      .fanzine-article-header {
+        break-inside: avoid !important;
+        break-after: avoid !important;
+        page-break-after: avoid !important;
+      }
+
+      .fanzine-article-block figure,
+      .fanzine-article-block img,
+      .fanzine-qr-block {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+      }
+
+      /* Texto de cajas aside sin huecos */
+      .fanzine-editorial-flow :global(.editorial-aside) {
+        float: none !important;
+        width: 100% !important;
+        margin: 6px 0 8px 0 !important;
+        clear: both !important;
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+        text-align: left !important;
+      }
+
+      .fanzine-editorial-flow :global(.editorial-aside-content p) {
+        font-size: 8.5pt !important;
+        line-height: 1.35 !important;
+        text-align: left !important;
+        word-spacing: normal !important;
+      }
+    </style>
+  </head>
+  <body class="text-black font-serif">
+    <!-- Barra superior de control (sólo visible en navegador) -->
+    <div class="no-print max-w-[210mm] mx-auto mb-4 bg-yellow-300 border-2 border-black p-3 flex flex-wrap justify-between items-center font-mono text-xs shadow-[3px_3px_0px_#000]">
+      <div>
+        <span class="font-bold">FANZINE IMPRESO (A4)</span> — Portada: <strong>1 Destacado + {portadaArticles.length} Portada</strong> | Interiores: <strong>{interiorArticles.length} Artículos (3 Columnas Continuas)</strong>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="window.print()" class="brutal-btn brutal-btn-primary text-xs py-1 px-3">
+          🖨️ Imprimir Navegador
+        </button>
+        <a href="/api/fanzine/export" class="brutal-btn text-xs py-1 px-3 bg-red-600 text-white hover:bg-red-700">
+          📥 Descargar PDF Puppeteer
+        </a>
+        <a href="/admin/export-fanzine" class="brutal-btn text-xs py-1 px-3">
+          ← Volver al Selector
+        </a>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- HOJA 1: LA PORTADA (Layout Asimétrico)     -->
+    <!-- ========================================== -->
+    <div class="sheet-container fanzine-portada-page">
+      <!-- Cabecera Editorial Principal -->
+      <Header isPrintView={true} />
+
+      <!-- Cuadrícula de Portada: Columna Ancha (Destacado) + Columna Estrecha (Portada) -->
+      <div class="fanzine-portada-grid">
+        <!-- 1. ARTÍCULO DESTACADO (Columna Ancha y Titular más Grande) -->
+        {mainDestacado && (
+          <section class="fanzine-destacado-col">
+            <div class="mb-1.5 flex items-center justify-between font-mono text-[8.5px] uppercase tracking-wider text-gray-700 border-b border-black pb-0.5">
+              <span class="bg-black text-white px-1 py-0.5 font-bold">★ TEMA PRINCIPAL DE PORTADA</span>
+              <span>Por {mainDestacado.author} • {new Date(mainDestacado.createdAt).toLocaleDateString('es-ES')}</span>
+            </div>
+
+            <!-- Titular Grande de Portada -->
+            <h2 class="text-xl sm:text-2xl font-black font-serif uppercase tracking-tight leading-tight text-black mb-2">
+              {mainDestacado.title}
+            </h2>
+
+            <!-- Fotografía Principal con Trama Halftone -->
+            {mainDestacado.photoUrl && (
+              <figure class="my-2">
+                <div class="border-2 border-black overflow-hidden bg-black shadow-[2px_2px_0px_#000]">
+                  <img
+                    src={mainDestacado.photoUrl}
+                    alt={mainDestacado.photoCaption || mainDestacado.title}
+                    class="w-full h-auto object-cover max-h-[170px] halftone-img block"
+                  />
+                </div>
+                {mainDestacado.photoCaption && (
+                  <figcaption class="font-mono text-[8.5px] text-gray-700 mt-0.5 italic border-l-2 border-black pl-1.5">
+                    ▲ {mainDestacado.photoCaption}
+                  </figcaption>
+                )}
+              </figure>
+            )}
+
+            <!-- Extracto Destacado en Caja Editorial -->
+            <div class="fanzine-destacado-excerpt bg-gray-50 border-l-4 border-black p-2.5 my-2 shadow-[2px_2px_0px_rgba(0,0,0,0.1)]">
+              <p class="font-serif text-[10pt] sm:text-[10.5pt] leading-snug text-black italic m-0">
+                "{mainDestacado.excerpt || (mainDestacado.content.substring(0, 220) + '...')}"
+              </p>
+            </div>
+
+            <!-- Código QR a la Fuente Original -->
+            {mainDestacado.sourceUrl && qrMap.get(mainDestacado.id) && (
+              <div class="flex items-center gap-2 border border-black p-1.5 bg-white my-2">
+                <img src={qrMap.get(mainDestacado.id)} alt="QR" class="w-10 h-10 border border-black flex-shrink-0" />
+                <div class="font-mono text-[7.5px] uppercase leading-tight">
+                  <span class="font-bold block">VERSIÓN DIGITAL / FUENTE OFICIAL:</span>
+                  <span class="break-all text-gray-600">{mainDestacado.sourceUrl}</span>
+                </div>
+              </div>
+            )}
+
+            <div class="font-mono text-[8.5px] uppercase font-bold text-gray-700 mt-2 pt-1 border-t border-dashed border-gray-400">
+              [ Continúa en páginas interiores ➔ ]
+            </div>
+          </section>
+        )}
+
+        <!-- 2. ARTÍCULOS DE PORTADA (Columna más Estrecha y Titulares Secundarios) -->
+        <aside class="fanzine-portada-secondary-col">
+          <div class="border-b-2 border-black pb-1 mb-2 flex items-center justify-between font-mono text-[8.5px] uppercase font-bold text-black">
+            <span>NOTICIAS EN PORTADA</span>
+            <span class="bg-yellow-300 px-1 border border-black">SUMARIO ({portadaArticles.length})</span>
+          </div>
+
+          <div class="space-y-2.5">
+            {portadaArticles.map((art) => (
+              <article class="border-b border-dashed border-gray-400 pb-2 last:border-b-0">
+                <div class="font-mono text-[7.5pt] uppercase text-gray-600 mb-0.5">
+                  Por {art.author} • {new Date(art.createdAt).toLocaleDateString('es-ES')}
+                </div>
+                <!-- Titular Secundario -->
+                <h3 class="text-xs sm:text-[10.5pt] font-black font-serif uppercase tracking-tight leading-tight mb-1 text-black">
+                  {art.title}
+                </h3>
+                <!-- Extracto -->
+                <p class="font-serif text-[8.25pt] leading-snug text-gray-800 italic m-0 line-clamp-3">
+                  "{art.excerpt || (art.content.substring(0, 150) + '...')}"
+                </p>
+                <div class="font-mono text-[7.5pt] font-bold text-black mt-1">
+                  [ Continúa en interior ➔ ]
+                </div>
+              </article>
+            ))}
+          </div>
+        </aside>
+      </div>
+
+      <!-- Pie de Portada -->
+      <div class="fanzine-portada-footer border-t-2 border-black pt-1.5 mt-3 flex justify-between items-center font-mono text-[7.5pt] uppercase font-bold">
+        <span>LA PARTE ARRENDATARIA — EDICIÓN IMPRESA POPULAR</span>
+        <span>CONTINÚA EN PÁGINAS INTERIORES ➔</span>
+      </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- HOJAS INTERIORES: ARTÍCULOS COMPLETOS A 3 COLS CONTINUAS -->
+    <!-- ======================================================== -->
+    <div class="sheet-container fanzine-interior-page">
+      <!-- Encabezado de Página Interior / Folio de Prensa -->
+      <div class="fanzine-inner-page-header border-b-2 border-black pb-1 mb-3 flex justify-between items-center font-mono text-[8pt] uppercase font-bold">
+        <span>LA PARTE ARRENDATARIA — PÁGINAS INTERIORES</span>
+        <span>ÓRGANO DE CONTRAINFORMACIÓN EDITORIAL</span>
+        <span>Nº 01 • EDICIÓN POPULAR</span>
+      </div>
+
+      <!-- Flujo Editorial Continuo a 3 Columnas CSS -->
+      <main class="fanzine-editorial-flow">
+        {interiorArticles.map((article) => (
+          <ArticleCard
+            article={article}
+            isPrintView={true}
+            qrDataUrl={qrMap.get(article.id) || ''}
+          />
+        ))}
+      </main>
+    </div>
+  </body>
+</html>

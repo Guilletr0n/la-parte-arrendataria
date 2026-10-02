@@ -1,0 +1,261 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getCurrentUser, canExportPdf } from '../../lib/auth';
+import { getArticles } from '../../lib/db';
+
+export const prerender = false;
+
+const user = await getCurrentUser(Astro.cookies);
+if (!user || !canExportPdf(user)) {
+  return Astro.redirect('/admin/login');
+}
+
+const publishedArticles = await getArticles({ status: 'published' });
+---
+
+<Layout title="Confección y Exportación de Fanzine | La Parte Arrendataria" maxWidth="max-w-[850px]">
+  <div class="border-[3px] border-black bg-white p-6 shadow-[6px_6px_0px_#000]">
+    <!-- Cabecera -->
+    <div class="flex justify-between items-center border-b-2 border-black pb-3 mb-6 font-mono">
+      <div>
+        <span class="text-xs font-bold uppercase text-red-700 block">TALLER DE IMPRENTA EDITORIAL</span>
+        <h1 class="text-2xl font-black font-serif uppercase tracking-tight m-0">
+          Exportar Fanzine a 3 Columnas
+        </h1>
+      </div>
+      <a href="/admin" class="brutal-btn text-xs">← Volver al Panel</a>
+    </div>
+
+    <!-- Guía del flujo editorial -->
+    <div class="border-2 border-black bg-yellow-100 p-4 mb-6 font-mono text-xs text-black">
+      <div class="font-bold uppercase mb-1">📋 Protocolo de Composición de Portada e Interiores del Fanzine:</div>
+      <ul class="list-disc pl-4 space-y-1 text-gray-800">
+        <li><strong>⭐ Destacado:</strong> Aparece en la <strong>PORTADA (Pág. 1)</strong> con titular grande, columna ancha, extracto y fotografía.</li>
+        <li><strong>📰 Portada:</strong> Aparece en la <strong>PORTADA (Pág. 1)</strong> en columna lateral de sumario (caben hasta 3 artículos con titular y extracto).</li>
+        <li><strong>📄 Interior:</strong> Se maquetan en las <strong>PÁGINAS INTERIORES (Pág. 2+)</strong> en un flujo continuo de 3 columnas conectadas (sin columnas vacías).</li>
+      </ul>
+    </div>
+
+    <div id="status-box" class="hidden mb-4 p-3 border-2 font-mono text-xs font-bold"></div>
+
+    <form id="fanzine-form" class="space-y-4 font-mono text-xs">
+      <div class="border-2 border-black overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-gray-100 border-b-2 border-black uppercase text-[11px]">
+              <th class="p-2 w-48">Categoría en Fanzine</th>
+              <th class="p-2 w-16 text-center">Orden</th>
+              <th class="p-2">Artículo y Extracto</th>
+              <th class="p-2 w-44">Opciones Interior</th>
+            </tr>
+          </thead>
+          <tbody>
+            {publishedArticles.length === 0 ? (
+              <tr>
+                <td colspan="4" class="p-4 text-center text-gray-500 italic">
+                  No hay artículos publicados disponibles para el fanzine.
+                </td>
+              </tr>
+            ) : (
+              publishedArticles.map((art) => {
+                const currentCategory = art.fanzineCategory || (art.selectedForPrint ? 'interior' : 'none');
+                return (
+                  <tr class="border-b border-gray-300 hover:bg-yellow-50" data-article-id={art.id}>
+                    <!-- Selector de Categoría -->
+                    <td class="p-2">
+                      <select
+                        name={`category_${art.id}`}
+                        class="w-full border-2 border-black p-1.5 font-bold bg-white text-xs cursor-pointer"
+                        onchange="updateSelectionCounter()"
+                      >
+                        <option value="destacado" selected={currentCategory === 'destacado'}>
+                          ⭐ Destacado (Portada: Columna Ancha)
+                        </option>
+                        <option value="portada" selected={currentCategory === 'portada'}>
+                          📰 Portada (Portada: Sumario, hasta 3)
+                        </option>
+                        <option value="interior" selected={currentCategory === 'interior'}>
+                          📄 Interior (Páginas Interiores: 3 Cols)
+                        </option>
+                        <option value="none" selected={currentCategory === 'none'}>
+                          ✖️ No incluir
+                        </option>
+                      </select>
+                    </td>
+
+                    <!-- Orden -->
+                    <td class="p-2 text-center">
+                      <input
+                        type="number"
+                        name={`order_${art.id}`}
+                        value={art.printOrder || 1}
+                        min="1"
+                        max="99"
+                        class="w-12 border border-black p-1 text-center font-bold bg-white"
+                      />
+                    </td>
+
+                    <!-- Artículo y Extracto -->
+                    <td class="p-2">
+                      <span class="font-bold text-black block text-sm">{art.title}</span>
+                      <span class="text-[10px] text-gray-500 block mb-1">
+                        Por {art.author} ({art.authorRole})
+                      </span>
+                      {art.excerpt && (
+                        <p class="text-[11px] text-gray-700 italic border-l-2 border-gray-400 pl-2 line-clamp-2">
+                          "{art.excerpt}"
+                        </p>
+                      )}
+                    </td>
+
+                    <!-- Opciones extra / Multimedia -->
+                    <td class="p-2 text-[11px] space-y-1">
+                      <label class="flex items-center gap-1.5 cursor-pointer font-bold text-gray-800">
+                        <input
+                          type="checkbox"
+                          name={`interior_${art.id}`}
+                          checked={art.includeInInterior ?? (currentCategory === 'interior')}
+                          class="accent-black"
+                        />
+                        <span>Texto en Interior</span>
+                      </label>
+                      <div class="text-[10px] text-gray-500">
+                        {art.photoUrl ? '📷 Foto halftone' : '—'} • {art.sourceUrl ? '🏁 QR activo' : '—'}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="pt-4 border-t-2 border-black flex flex-wrap justify-between items-center gap-3">
+        <div class="font-bold text-gray-700" id="counter-summary">
+          Cargando configuración...
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onclick="saveFanzineSelection()"
+            class="brutal-btn bg-white hover:bg-gray-100"
+          >
+            💾 Guardar Selección
+          </button>
+
+          <button
+            type="button"
+            onclick="saveAndOpenPreview()"
+            class="brutal-btn bg-yellow-300"
+          >
+            👁️ Vista Impresión 3 Cols
+          </button>
+
+          <button
+            type="button"
+            onclick="saveAndExportPdf()"
+            id="export-pdf-btn"
+            class="brutal-btn brutal-btn-primary"
+          >
+            📥 Exportar Fanzine (PDF)
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <script is:inline>
+    function updateSelectionCounter() {
+      const rows = document.querySelectorAll('tr[data-article-id]');
+      let countDestacado = 0;
+      let countPortada = 0;
+      let countInterior = 0;
+
+      rows.forEach(row => {
+        const id = row.getAttribute('data-article-id');
+        const cat = row.querySelector(`select[name="category_${id}"]`)?.value;
+        if (cat === 'destacado') countDestacado++;
+        else if (cat === 'portada') countPortada++;
+        else if (cat === 'interior') countInterior++;
+      });
+
+      const total = countDestacado + countPortada + countInterior;
+      const summary = document.getElementById('counter-summary');
+      if (summary) {
+        summary.innerHTML = `Portada: <strong class="text-black">${countDestacado} Destacado + ${countPortada} Portada (máx 3)</strong> | Interior: <strong class="text-black">${countInterior} Artículos</strong> (Total Fanzine: <span class="text-red-700 font-black">${total}</span>)`;
+      }
+    }
+
+    // Initialize counter on load
+    updateSelectionCounter();
+
+    async function saveFanzineSelection() {
+      const rows = document.querySelectorAll('tr[data-article-id]');
+      const statusBox = document.getElementById('status-box');
+      statusBox.classList.add('hidden');
+
+      const selections = [];
+
+      rows.forEach(row => {
+        const id = row.getAttribute('data-article-id');
+        const catSelect = row.querySelector(`select[name="category_${id}"]`);
+        const orderInput = row.querySelector(`input[name="order_${id}"]`);
+        const interiorCheckbox = row.querySelector(`input[name="interior_${id}"]`);
+
+        const category = catSelect ? catSelect.value : 'none';
+        const order = orderInput ? parseInt(orderInput.value, 10) || 1 : 1;
+        const includeInInterior = interiorCheckbox ? interiorCheckbox.checked : (category === 'interior');
+
+        if (category !== 'none') {
+          selections.push({ id, category, order, includeInInterior });
+        }
+      });
+
+      selections.sort((a, b) => a.order - b.order);
+
+      try {
+        const res = await fetch('/api/fanzine/select', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ selections }),
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          statusBox.className = 'mb-4 p-3 border-2 border-green-700 bg-green-100 text-green-900 font-mono text-xs font-bold';
+          statusBox.innerText = `Selección guardada con éxito (${data.count} artículos maquetados para el PDF).`;
+          statusBox.classList.remove('hidden');
+          return true;
+        } else {
+          statusBox.className = 'mb-4 p-3 border-2 border-red-700 bg-red-100 text-red-900 font-mono text-xs font-bold';
+          statusBox.innerText = data.error || 'Error al guardar la selección.';
+          statusBox.classList.remove('hidden');
+          return false;
+        }
+      } catch (e) {
+        statusBox.className = 'mb-4 p-3 border-2 border-red-700 bg-red-100 text-red-900 font-mono text-xs font-bold';
+        statusBox.innerText = 'Error de comunicación con el servidor.';
+        statusBox.classList.remove('hidden');
+        return false;
+      }
+    }
+
+    async function saveAndOpenPreview() {
+      const ok = await saveFanzineSelection();
+      window.open('/print/issue-preview', '_blank');
+    }
+
+    async function saveAndExportPdf() {
+      const btn = document.getElementById('export-pdf-btn');
+      if (btn) btn.innerText = '⏳ Generando PDF...';
+      const ok = await saveFanzineSelection();
+      window.location.href = '/api/fanzine/export';
+      setTimeout(() => {
+        if (btn) btn.innerText = '📥 Exportar Fanzine (PDF)';
+      }, 4000);
+    }
+  </script>
+</Layout>

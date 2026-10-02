@@ -1,0 +1,36 @@
+steps:
+  # 1. Construir la imagen Docker usando Buildkit
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--tag'
+      - 'gcr.io/$PROJECT_ID/la-parte-arrendataria:$COMMIT_SHA'
+      - '--tag'
+      - 'gcr.io/$PROJECT_ID/la-parte-arrendataria:latest'
+      - '.'
+
+  # 2. Subir imagen a Google Container Registry / Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/la-parte-arrendataria:latest']
+
+  # 3. Desplegar en Cloud Run con 2GB de memoria (recomendado para Puppeteer)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'la-parte-arrendataria'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/la-parte-arrendataria:latest'
+      - '--region'
+      - 'europe-west1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '2Gi'
+      - '--cpu'
+      - '1'
+
+images:
+  - 'gcr.io/$PROJECT_ID/la-parte-arrendataria:latest'

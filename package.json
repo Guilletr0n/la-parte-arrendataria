@@ -1,0 +1,27 @@
+{
+  "name": "la-parte-arrendataria",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "astro dev --host",
+    "build": "astro build",
+    "preview": "astro preview",
+    "start": "node ./dist/server/entry.mjs"
+  },
+  "type": "module",
+  "dependencies": {
+    "@astrojs/node": "^11.1.6",
+    "@tailwindcss/vite": "^4.3.3",
+    "astro": "^7.3.5",
+    "firebase-admin": "^14.5.0",
+    "marked": "^18.0.14",
+    "puppeteer": "^25.12.0",
+    "qrcode": "^1.5.4",
+    "tailwindcss": "^4.3.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "@types/qrcode": "^1.5.6"
+  }
+}

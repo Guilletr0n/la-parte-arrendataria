@@ -1,0 +1,54 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Header from '../components/Header.astro';
+import ArticleCard from '../components/ArticleCard.astro';
+import { getArticles } from '../lib/db';
+
+export const prerender = false;
+
+const articles = await getArticles({ status: 'published' });
+---
+
+<Layout title="La Parte Arrendataria — Periódico de Guerrilla Inquilina">
+  <!-- Cabecera de Publicación: enmarcada en 720px en la Web -->
+  <Header />
+
+  <!-- Manifiesto Rápido Guerrilla -->
+  <div class="border-2 border-black bg-white p-3 mb-8 shadow-[4px_4px_0px_#000] text-xs font-mono">
+    <div class="flex items-center justify-between mb-1">
+      <span class="font-bold uppercase tracking-wider text-red-700">★ AVISO A LA COMUNIDAD ARRENDATARIA</span>
+      <span class="bg-black text-white px-1.5 py-0.5 text-[10px]">EDICIÓN DIGITAL</span>
+    </div>
+    <p class="text-gray-800 leading-normal">
+      Este fanzine se compone de notas de voz de 2 minutos, análisis de urgencia y una selección editorial lista para ser fotocopiada a 3 columnas. Cada artículo contiene un código QR a la fuente original para verificación pública.
+    </p>
+  </div>
+
+  <!-- Feed Cronológico de Artículos -->
+  <section class="space-y-2">
+    {articles.length === 0 ? (
+      <div class="border-2 border-dashed border-black p-8 text-center font-mono">
+        <p class="text-lg font-bold uppercase mb-2">No hay artículos publicados todavía</p>
+        <p class="text-sm text-gray-600 mb-4">Accede al panel de administración para redactar el primer número.</p>
+        <a href="/admin/login" class="brutal-btn brutal-btn-primary">Entrar al CMS</a>
+      </div>
+    ) : (
+      articles.map(article => (
+        <ArticleCard article={article} isExcerptOnly={true} />
+      ))
+    )}
+  </section>
+
+  <!-- Banner para Imprimir Fanzine Físico -->
+  <div class="my-10 border-4 border-black p-6 bg-yellow-300 shadow-[6px_6px_0px_#000] text-center font-mono">
+    <h3 class="text-xl font-black uppercase tracking-tight mb-2">
+      ¿Quieres la edición física en papel?
+    </h3>
+    <p class="text-xs sm:text-sm text-black mb-4">
+      Maquetación profesional a 3 columnas optimizada para fotocopiadoras de barrio con QR impresos.
+    </p>
+    <a href="/admin/export-fanzine" class="brutal-btn brutal-btn-primary text-sm">
+      Ir al Selector & Descarga de PDF Fanzine →
+    </a>
+  </div>
+</Layout>

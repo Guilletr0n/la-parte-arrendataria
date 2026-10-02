@@ -1,0 +1,60 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Header from '../../components/Header.astro';
+import ArticleCard from '../../components/ArticleCard.astro';
+import { getArticleBySlug } from '../../lib/db';
+import { getCurrentUser } from '../../lib/auth';
+
+export const prerender = false;
+
+const { slug } = Astro.params;
+if (!slug) {
+  return Astro.redirect('/');
+}
+
+const article = await getArticleBySlug(slug);
+if (!article) {
+  return Astro.redirect('/');
+}
+
+// If draft, only allow logged-in users to preview it
+if (article.status === 'draft') {
+  const user = await getCurrentUser(Astro.cookies);
+  if (!user) {
+    return Astro.redirect('/');
+  }
+}
+---
+
+<Layout
+  title={`${article.title} | La Parte Arrendataria`}
+  description={article.excerpt || article.title}
+>
+  <!-- Cabecera idéntica a la home: al hacer clic en el H1 (Arrendataria) se vuelve a la home -->
+  <Header />
+
+  <!-- Breadcrumb / Volver -->
+  <div class="mb-6 flex justify-between items-center text-xs font-mono border-b border-gray-300 pb-2">
+    <a href="/" class="font-bold hover:underline text-black flex items-center gap-1">
+      <span>←</span> Volver a la portada
+    </a>
+    <span class="text-gray-500 uppercase">
+      {article.status === 'draft' ? '⚠️ Vista Previa de Borrador' : 'Edición Digital Oficial'}
+    </span>
+  </div>
+
+  <!-- Artículo Completo -->
+  <main>
+    <ArticleCard article={article} isExcerptOnly={false} />
+  </main>
+
+  <!-- Navegación y pie de artículo -->
+  <div class="mt-8 pt-6 border-t-2 border-black flex flex-wrap justify-between items-center gap-4 font-mono text-xs">
+    <a href="/" class="brutal-btn">
+      ← Volver al listado de artículos
+    </a>
+    <a href="/admin/export-fanzine" class="brutal-btn bg-yellow-300">
+      ⚡ Confeccionar e Imprimir Fanzine PDF
+    </a>
+  </div>
+</Layout>

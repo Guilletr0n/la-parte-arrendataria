@@ -1,0 +1,57 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+  maxWidth?: string;
+}
+
+const {
+  title = 'La Parte Arrendataria | Fanzine de Guerrilla',
+  description = 'Órgano de contrainformación editorial, derecho a la vivienda y cultura inquilina.',
+  maxWidth = 'max-w-[720px]',
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="description" content={description} />
+    <title>{title}</title>
+    <!-- Google Fonts for Editorial / Brutalist aesthetic -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Playfair+Display:ital,wght@0,700;0,900;1,400;1,700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="min-h-screen flex flex-col items-center p-3 sm:p-6 text-black selection:bg-yellow-300 selection:text-black">
+    <!-- Top Bar Navigation / Admin access -->
+    <nav class={`w-full ${maxWidth} flex justify-between items-center mb-4 no-print text-xs font-mono border-b border-gray-400 pb-2`}>
+      <a href="/" class="font-bold hover:underline">← EDICIÓN DIGITAL ACTUAL</a>
+      <div class="flex gap-4 items-center">
+        <a href="/admin/export-fanzine" class="hover:underline font-bold text-red-700">⚡ IMPRIMIR FANZINE</a>
+        <a href="/admin" class="hover:underline font-bold">PANEL CMS [ADMIN]</a>
+      </div>
+    </nav>
+
+    <!-- Main Container: max-w-[720px] for public feed as required -->
+    <main class={`w-full ${maxWidth} flex-1`}>
+      <slot />
+    </main>
+
+    <!-- Footer -->
+    <footer class={`w-full ${maxWidth} mt-12 mb-6 pt-4 border-t-2 border-black text-center font-mono text-xs text-gray-700 no-print`}>
+      <p class="font-bold mb-1">LA PARTE ARRENDATARIA — EDICIÓN POPULAR FANZINE</p>
+      <p class="text-[11px] text-gray-500">
+        Copyleft 2026. Distribución física y digital libre. Fotocopia este panfleto y pásalo.
+      </p>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,134 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getCurrentUser } from '../../lib/auth';
+
+export const prerender = false;
+
+const user = await getCurrentUser(Astro.cookies);
+if (user) {
+  return Astro.redirect('/admin');
+}
+---
+
+<Layout title="Acceso al CMS | La Parte Arrendataria">
+  <div class="max-w-[480px] mx-auto my-8">
+    <div class="border-[3px] border-black bg-white p-6 shadow-[6px_6px_0px_#000]">
+      <div class="border-b-2 border-black pb-3 mb-6 text-center">
+        <span class="text-xs font-mono font-bold uppercase tracking-widest text-red-600 block">
+          CONTROL DE ACCESO RBAC
+        </span>
+        <h1 class="text-2xl font-black font-serif uppercase tracking-tight text-black m-0">
+          Redacción CMS
+        </h1>
+      </div>
+
+      <div id="error-box" class="hidden mb-4 p-3 bg-red-100 border-2 border-red-700 text-red-800 text-xs font-mono font-bold"></div>
+
+      <form id="login-form" class="space-y-4 font-mono text-sm">
+        <div>
+          <label class="block font-bold uppercase text-xs mb-1" for="email">
+            Correo Electrónico:
+          </label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            required
+            placeholder="admin@lapartearrendataria.org"
+            class="w-full border-2 border-black p-2 bg-[#fdfdfd] focus:outline-none focus:ring-2 focus:ring-black"
+          />
+        </div>
+
+        <div>
+          <label class="block font-bold uppercase text-xs mb-1" for="password">
+            Contraseña:
+          </label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            required
+            placeholder="••••••••"
+            class="w-full border-2 border-black p-2 bg-[#fdfdfd] focus:outline-none focus:ring-2 focus:ring-black"
+          />
+        </div>
+
+        <button
+          type="submit"
+          id="submit-btn"
+          class="w-full brutal-btn brutal-btn-primary py-2 text-center text-sm font-bold mt-2"
+        >
+          Entrar a la Redacción →
+        </button>
+      </form>
+
+      <!-- Quick Demo Access Boxes -->
+      <div class="mt-6 pt-4 border-t-2 border-dashed border-gray-400 font-mono text-xs">
+        <span class="font-bold text-gray-700 block mb-2 uppercase">Credenciales de Acceso Rápido:</span>
+        <div class="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onclick="fillCredentials('admin@lapartearrendataria.org', 'admin123')"
+            class="p-2 border border-black bg-gray-100 hover:bg-yellow-200 text-left transition-colors"
+          >
+            <strong class="block text-red-700 uppercase">★ Rol Admin</strong>
+            <span class="text-[10px] text-gray-600 block">admin@... / admin123</span>
+            <span class="text-[9px] text-gray-500">Publicar, borrar, exportar PDF</span>
+          </button>
+
+          <button
+            type="button"
+            onclick="fillCredentials('editor@lapartearrendataria.org', 'editor123')"
+            class="p-2 border border-black bg-gray-100 hover:bg-yellow-200 text-left transition-colors"
+          >
+            <strong class="block text-blue-800 uppercase">✎ Rol Editor</strong>
+            <span class="text-[10px] text-gray-600 block">editor@... / editor123</span>
+            <span class="text-[9px] text-gray-500">1 foto, SpeakPipe, Markdown</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script is:inline>
+    function fillCredentials(email, pass) {
+      document.getElementById('email').value = email;
+      document.getElementById('password').value = pass;
+    }
+
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorBox = document.getElementById('error-box');
+      const submitBtn = document.getElementById('submit-btn');
+      errorBox.classList.add('hidden');
+      submitBtn.disabled = true;
+      submitBtn.innerText = 'Verificando...';
+
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          window.location.href = '/admin';
+        } else {
+          errorBox.innerText = data.error || 'Credenciales inválidas';
+          errorBox.classList.remove('hidden');
+          submitBtn.disabled = false;
+          submitBtn.innerText = 'Entrar a la Redacción →';
+        }
+      } catch (err) {
+        errorBox.innerText = 'Error de conexión con el servidor.';
+        errorBox.classList.remove('hidden');
+        submitBtn.disabled = false;
+        submitBtn.innerText = 'Entrar a la Redacción →';
+      }
+    });
+  </script>
+</Layout>

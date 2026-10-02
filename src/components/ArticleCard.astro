@@ -1,0 +1,140 @@
+---
+import type { Article } from '../lib/types';
+import { renderArticleMarkdown } from '../lib/markdown';
+
+interface Props {
+  article: Article;
+  isPrintView?: boolean;
+  isExcerptOnly?: boolean;
+  qrDataUrl?: string;
+}
+
+const { article, isPrintView = false, isExcerptOnly = false, qrDataUrl } = Astro.props;
+
+// Render markdown content to HTML with editorial aside support
+const htmlContent = renderArticleMarkdown(article.content || '');
+const formattedDate = new Date(article.createdAt).toLocaleDateString('es-ES', {
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+});
+const articleUrl = `/articulo/${article.slug}`;
+---
+
+<article class={`editorial-article mb-10 pb-8 border-b-2 border-black last:border-b-0 ${isPrintView ? 'fanzine-article-block' : ''}`}>
+  <!-- Header del artículo (agrupado para evitar orfandad en columnas de fanzine) -->
+  <div class="fanzine-article-header">
+    <!-- Meta header of article: Autor y Fecha -->
+    <div class="flex items-center justify-between text-xs font-mono mb-2 uppercase text-gray-700">
+      <div class="flex items-center gap-2">
+        <span class="bg-black text-white font-bold px-1.5 py-0.5 text-[10px]">
+          {article.authorRole.toUpperCase()}
+        </span>
+        <span class="font-bold text-black">{article.author}</span>
+      </div>
+      <span>{formattedDate}</span>
+    </div>
+
+    <!-- Title: En modo extracto es enlace a la página completa -->
+    <h2 class="text-xl sm:text-2xl font-black font-serif text-black uppercase mb-3 leading-tight">
+      {isExcerptOnly ? (
+        <a href={articleUrl} class="hover:underline hover:text-red-700 transition-colors block text-inherit">
+          {article.title}
+        </a>
+      ) : (
+        article.title
+      )}
+    </h2>
+  </div>
+
+  {isExcerptOnly ? (
+    <div class="space-y-3">
+      <p class="font-serif text-sm sm:text-base text-gray-900 leading-relaxed italic border-l-2 border-black pl-3 py-1 bg-white/70">
+        {article.excerpt || (article.content.length > 200 ? article.content.substring(0, 200) + '...' : article.content)}
+      </p>
+      <div class="pt-1">
+        <a href={articleUrl} class="brutal-btn text-xs font-bold">
+          Leer artículo completo →
+        </a>
+      </div>
+    </div>
+  ) : (
+    <div>
+      <!-- 1 Fotografía Única (Strict single image) -->
+      {article.photoUrl && (
+        <figure class="my-4">
+          <div class="border-[3px] border-black overflow-hidden bg-black shadow-[4px_4px_0px_#000]">
+            <img
+              src={article.photoUrl}
+              alt={article.photoCaption || article.title}
+              class="w-full h-auto object-cover max-h-[420px] halftone-img block"
+              loading="lazy"
+            />
+          </div>
+          {article.photoCaption && (
+            <figcaption class="font-mono text-xs text-gray-700 mt-1 italic border-l-2 border-black pl-2">
+              ▲ {article.photoCaption}
+            </figcaption>
+          )}
+        </figure>
+      )}
+
+      <!-- SpeakPipe Voice Note Player (Web pública) -->
+      {!isPrintView && article.speakPipeAudioUrl && (
+        <div class="my-4 p-3 border-2 border-black bg-white shadow-[3px_3px_0px_#000]">
+          <div class="flex items-center gap-2 font-mono text-xs uppercase font-bold mb-2">
+            <span class="inline-block w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse"></span>
+            <span>Nota de Voz de Redacción (SpeakPipe • Máx 2 min)</span>
+          </div>
+          {article.speakPipeAudioUrl.includes('embed') ? (
+            <iframe
+              src={article.speakPipeAudioUrl}
+              class="w-full h-16 border-0"
+              allow="microphone"
+              title="Audio SpeakPipe"
+            ></iframe>
+          ) : (
+            <audio controls class="w-full h-10 accent-black">
+              <source src={article.speakPipeAudioUrl} type="audio/mpeg" />
+              Tu navegador no soporta el reproductor de audio.
+            </audio>
+          )}
+        </div>
+      )}
+
+      <!-- Markdown Body with Drop Cap and Balanced Typo -->
+      <div class="prose prose-neutral max-w-none text-black text-sm sm:text-base font-serif leading-relaxed">
+        <Fragment set:html={htmlContent} />
+      </div>
+
+      <!-- Enlace Fuente Original + QR (Exclusivo en PDF o link en web) -->
+      {article.sourceUrl && (
+        <div class="mt-6 pt-3 border-t border-dashed border-gray-400">
+          {isPrintView ? (
+            <div class="flex items-center gap-3 border border-black p-2 bg-gray-50 break-inside-avoid fanzine-qr-block">
+              {qrDataUrl && (
+                <img src={qrDataUrl} alt="QR Fuente" class="w-16 h-16 border border-black flex-shrink-0" />
+              )}
+              <div class="font-mono text-[9px] uppercase leading-tight">
+                <span class="font-bold block text-[10px]">ESCANEA PARA LEER FUENTE ORIGINAL:</span>
+                <span class="break-all text-gray-600">{article.sourceUrl}</span>
+              </div>
+            </div>
+          ) : (
+            <div class="font-mono text-xs flex items-center justify-between">
+              <span class="text-gray-600 uppercase font-semibold">Fuente / Documento Original:</span>
+              <a
+                href={article.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="font-bold underline hover:bg-black hover:text-white px-1 transition-colors"
+              >
+                Consultar Enlace ↗
+              </a>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )}
+</article>

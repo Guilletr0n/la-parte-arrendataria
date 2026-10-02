@@ -1,0 +1,441 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --paper-bg: #f5f2eb;
+    --ink-black: #121212;
+    --ink-gray: #404040;
+    --paper-line: #222222;
+    --accent-red: #c92a2a;
+    --accent-yellow: #f59f00;
+  }
+
+  body {
+    background-color: var(--paper-bg);
+    color: var(--ink-black);
+    font-family: 'Georgia', 'Times New Roman', serif;
+    background-image: radial-gradient(rgba(0, 0, 0, 0.04) 1px, transparent 0);
+    background-size: 8px 8px;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    text-wrap: balance;
+    font-family: 'Courier New', Courier, monospace, serif;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: -0.02em;
+  }
+
+  h2 {
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 2rem;
+    line-height: 2.5rem;
+    margin: 2rem 0 1rem 0;
+  }
+
+  p,
+  blockquote,
+  li {
+    text-wrap: pretty;
+    line-height: 1.6;
+  }
+}
+
+/* Brutalist Shadows & Utilities */
+.brutal-box {
+  background: var(--paper-bg);
+  border: 3px solid var(--ink-black);
+  box-shadow: 5px 5px 0px var(--ink-black);
+  transition: all 0.15s ease-in-out;
+}
+
+.brutal-box-sm {
+  background: var(--paper-bg);
+  border: 2px solid var(--ink-black);
+  box-shadow: 3px 3px 0px var(--ink-black);
+}
+
+.brutal-btn {
+  display: inline-block;
+  background: #ffffff;
+  color: var(--ink-black);
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: 700;
+  text-transform: uppercase;
+  border: 2px solid var(--ink-black);
+  box-shadow: 4px 4px 0px var(--ink-black);
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.1s ease-in-out;
+}
+
+.brutal-btn:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0px var(--ink-black);
+}
+
+.brutal-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0px var(--ink-black);
+}
+
+.brutal-btn-primary {
+  background: var(--ink-black);
+  color: var(--paper-bg);
+}
+
+.brutal-btn-primary:hover {
+  background: #2a2a2a;
+}
+
+.brutal-btn-danger {
+  background: var(--accent-red);
+  color: #ffffff;
+}
+
+.brutal-badge {
+  display: inline-block;
+  font-family: monospace;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 0.15rem 0.5rem;
+  border: 1.5px solid var(--ink-black);
+}
+
+/* Halftone / Dither Newspaper effect for images */
+.halftone-img {
+  filter: grayscale(100%) contrast(150%);
+  border: 3px solid var(--ink-black);
+}
+
+.halftone-overlay {
+  position: relative;
+}
+
+.halftone-overlay::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  background: radial-gradient(rgba(0, 0, 0, 0.2) 1px, transparent 0);
+  background-size: 3px 3px;
+  opacity: 0.5;
+}
+
+/* Editorial Drop Cap (Sólo para el primer párrafo del cuerpo del artículo) */
+.editorial-article .prose>p:first-of-type::first-letter {
+  float: left;
+  font-size: 3.5rem;
+  line-height: 0.85;
+  font-weight: 900;
+  padding-right: 0.5rem;
+  padding-top: 0.2rem;
+  font-family: 'Georgia', serif;
+  color: var(--ink-black);
+}
+
+/* Desactivar cualquier drop-cap o primera letra gigante dentro del aside */
+.editorial-aside p::first-letter,
+.editorial-aside p:first-of-type::first-letter {
+  all: unset !important;
+  display: inline !important;
+  float: none !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+  font-weight: inherit !important;
+  font-family: inherit !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  color: inherit !important;
+}
+
+/* Newspaper Dividers */
+.newspaper-divider {
+  border: none;
+  border-top: 4px double var(--ink-black);
+  margin: 1.5rem 0;
+}
+
+.newspaper-divider-dashed {
+  border: none;
+  border-top: 2px dashed var(--ink-black);
+  margin: 1rem 0;
+}
+
+/* Editorial Aside (Caja destacada flotante en web: a la derecha, texto envolviendo el párrafo) */
+.editorial-aside {
+  float: right !important;
+  width: 46%;
+  max-width: 320px;
+  margin: 0.35rem 0 1.25rem 1.5rem;
+  clear: right;
+  border: 2.5px solid var(--ink-black);
+  background: #ffffff;
+  box-shadow: 4px 4px 0px var(--ink-black);
+  padding: 1rem 1.25rem;
+  box-sizing: border-box;
+}
+
+@media (max-width: 640px) {
+  .editorial-aside {
+    float: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 1.25rem 0 !important;
+  }
+}
+
+.editorial-aside-content {
+  font-family: 'Space Mono', 'Courier New', Courier, monospace;
+  color: var(--ink-black);
+}
+
+.editorial-aside-content p {
+  font-family: 'Space Mono', 'Courier New', Courier, monospace !important;
+  font-size: 1.1rem !important;
+  line-height: 1.55 !important;
+  font-weight: 700 !important;
+  color: #121212 !important;
+  margin: 0 0 0.5rem 0 !important;
+}
+
+.editorial-aside-content p:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* Adaptación para fanzine / maquetación 3 columnas (tanto en pantalla como PDF) */
+.fanzine-editorial-flow,
+.fanzine-columns {
+  column-count: 3;
+  column-gap: 5mm;
+  column-rule: 1px solid #111111;
+  text-align: justify;
+  hyphens: auto;
+}
+
+/* Tipografía de cuerpo de texto en fanzine / PDF: más compacta (8.25pt) */
+.fanzine-editorial-flow .prose,
+.fanzine-article-block .prose {
+  font-size: 8.25pt !important;
+  line-height: 1.32 !important;
+  color: #000000 !important;
+}
+
+.fanzine-editorial-flow .prose p,
+.fanzine-article-block .prose p {
+  font-size: 8.25pt !important;
+  line-height: 1.32 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0.45rem !important;
+  text-align: justify !important;
+  text-justify: inter-word !important;
+  hyphens: auto !important;
+  hyphenate-limit-chars: 6 3 3 !important;
+  hyphenate-limit-lines: 2 !important;
+  text-wrap: pretty !important;
+}
+
+/* Capitular adaptada al tamaño compacto de lectura */
+.fanzine-editorial-flow .editorial-article .prose>p:first-of-type::first-letter,
+.fanzine-article-block .prose>p:first-of-type::first-letter {
+  font-size: 2.35rem !important;
+  line-height: 0.8 !important;
+  padding-right: 0.3rem !important;
+  padding-top: 0.1rem !important;
+}
+
+/* Solución a títulos y subtítulos con espacios excesivos:
+   En columnas estrechas, los titulares SIEMPRE van alineados a la izquierda (nunca justificados)
+   para mantener espaciado entre palabras perfecto sin huecos blancos */
+.fanzine-article-header h2,
+.fanzine-editorial-flow h1,
+.fanzine-editorial-flow h2,
+.fanzine-editorial-flow h3,
+.fanzine-editorial-flow h4,
+.fanzine-article-block h1,
+.fanzine-article-block h2,
+.fanzine-article-block h3,
+.fanzine-article-block h4,
+.fanzine-editorial-flow .prose h1,
+.fanzine-editorial-flow .prose h2,
+.fanzine-editorial-flow .prose h3,
+.fanzine-editorial-flow .prose h4 {
+  text-align: left !important;
+  text-wrap: balance !important;
+  hyphens: manual !important;
+  word-spacing: normal !important;
+  letter-spacing: -0.01em !important;
+}
+
+.fanzine-article-header h2 {
+  font-size: 1.5rem !important;
+  line-height: 1.15 !important;
+  margin-bottom: 0.4rem !important;
+}
+
+.fanzine-editorial-flow .prose h2,
+.fanzine-article-block .prose h2 {
+  font-size: 0.95rem !important;
+  line-height: 1.2 !important;
+  margin-top: 0.65rem !important;
+  margin-bottom: 0.3rem !important;
+  font-weight: 900 !important;
+}
+
+/* Flujo continuo: el siguiente artículo comienza en la misma columna inmediatamente */
+.fanzine-article-block {
+  break-inside: auto !important;
+  page-break-inside: auto !important;
+  margin-bottom: 1.25rem !important;
+  padding-bottom: 1rem !important;
+  border-bottom: 2px dashed #444444 !important;
+}
+
+.fanzine-article-block:last-child {
+  border-bottom: none !important;
+}
+
+/* Protección de elementos indivisibles dentro de las columnas */
+.fanzine-article-header {
+  break-inside: avoid !important;
+  break-after: avoid !important;
+  page-break-after: avoid !important;
+}
+
+.fanzine-article-block figure,
+.fanzine-article-block img,
+.fanzine-qr-block {
+  break-inside: avoid !important;
+  page-break-inside: avoid !important;
+}
+
+/* Solución al texto de cajas destacadas (asides):
+   Alineado a la izquierda para evitar espaciados gigantescos de monospace */
+.fanzine-editorial-flow .editorial-aside,
+.fanzine-columns .editorial-aside,
+.fanzine-article-block .editorial-aside {
+  float: none !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 8px 0 10px 0 !important;
+  clear: both !important;
+  break-inside: avoid !important;
+  page-break-inside: avoid !important;
+  text-align: left !important;
+}
+
+.fanzine-editorial-flow .editorial-aside-content p,
+.fanzine-columns .editorial-aside-content p,
+.fanzine-article-block .editorial-aside-content p {
+  font-family: 'Space Mono', 'Courier New', Courier, monospace !important;
+  font-size: 8.5pt !important;
+  line-height: 1.35 !important;
+  font-weight: 700 !important;
+  color: #121212 !important;
+  margin: 0 0 0.3rem 0 !important;
+  text-align: left !important;
+  text-wrap: pretty !important;
+  word-spacing: normal !important;
+  letter-spacing: normal !important;
+  hyphens: auto !important;
+}
+
+/* Portada vs Páginas interiores (Salto de página estricto tras la portada) */
+.fanzine-portada-page {
+  page-break-after: always !important;
+  break-after: page !important;
+  break-inside: avoid !important;
+  page-break-inside: avoid !important;
+}
+
+.fanzine-interior-page {
+  page-break-before: always !important;
+  break-before: page !important;
+}
+
+/* Print CSS Styles for 3-Column Layout */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm 10mm 12mm 10mm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 8.25pt !important;
+    line-height: 1.32 !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .print-header {
+    width: 100% !important;
+    border-bottom: 3px double #000000;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    text-align: center;
+  }
+
+  .fanzine-columns,
+  .fanzine-editorial-flow {
+    column-count: 3;
+    column-gap: 5mm;
+    column-rule: 1px solid #222222;
+    text-align: justify;
+    hyphens: auto;
+  }
+
+  .fanzine-article-block {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px dashed #444444;
+  }
+
+  .fanzine-article-block:last-child {
+    border-bottom: none;
+  }
+
+  .editorial-aside {
+    float: none !important;
+    width: 100% !important;
+    margin: 6px 0 8px 0 !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    border: 1.5px solid #000000 !important;
+    box-shadow: 2px 2px 0px #000000 !important;
+    background: #fafafa !important;
+    padding: 6px 8px !important;
+    text-align: left !important;
+  }
+
+  .editorial-aside-content p {
+    font-size: 8.5pt !important;
+    line-height: 1.32 !important;
+    font-weight: 700 !important;
+    margin-bottom: 2px !important;
+    text-align: left !important;
+    word-spacing: normal !important;
+  }
+}

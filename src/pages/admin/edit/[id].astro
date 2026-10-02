@@ -1,0 +1,387 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import { getCurrentUser, canPublish, canEditArticle } from '../../../lib/auth';
+import { getArticleById } from '../../../lib/db';
+
+export const prerender = false;
+
+const user = await getCurrentUser(Astro.cookies);
+if (!user) {
+  return Astro.redirect('/admin/login');
+}
+
+const { id } = Astro.params;
+if (!id) {
+  return Astro.redirect('/admin');
+}
+
+const article = await getArticleById(id);
+if (!article) {
+  return Astro.redirect('/admin');
+}
+
+if (!canEditArticle(user, article.authorUid)) {
+  return Astro.redirect('/admin');
+}
+
+const isAdmin = canPublish(user);
+
+const defaultExcerpt = article.excerpt || (
+  article.content
+    ? article.content.split('\n\n').find(p => p.trim() && !p.trim().startsWith('#') && !p.trim().startsWith('>'))?.replace(/[*_#`]/g, '').trim().substring(0, 240) || ''
+    : ''
+);
+---
+
+<Layout title={`Editar: ${article.title} | La Parte Arrendataria`} maxWidth="max-w-[850px]">
+  <div class="border-[3px] border-black bg-white p-6 shadow-[6px_6px_0px_#000]">
+    <div class="flex justify-between items-center border-b-2 border-black pb-3 mb-6 font-mono">
+      <div>
+        <span class="text-xs font-bold uppercase text-red-700 block">EDICIÓN DE ARTÍCULO</span>
+        <h1 class="text-2xl font-black font-serif uppercase tracking-tight m-0 truncate max-w-[550px]">
+          {article.title}
+        </h1>
+      </div>
+      <div class="flex items-center gap-2">
+        <a
+          href={`/articulo/${article.slug}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="brutal-btn bg-yellow-300 text-xs font-bold hover:bg-yellow-400"
+        >
+          👁️ Ver en Web ↗
+        </a>
+        <a href="/admin" class="brutal-btn text-xs">← Volver al Panel</a>
+      </div>
+    </div>
+
+    <div id="alert-box" class="hidden mb-4 p-3 border-2 font-mono text-xs font-bold"></div>
+
+    <form id="edit-form" class="space-y-6 font-mono text-xs">
+      <!-- 1. Título -->
+      <div>
+        <label class="block font-bold uppercase mb-1" for="title">
+          1. Titular del Artículo <span class="text-red-700">*</span>:
+        </label>
+        <input
+          type="text"
+          id="title"
+          name="title"
+          required
+          value={article.title}
+          class="w-full border-2 border-black p-2 text-sm font-serif font-bold bg-[#fafafa] focus:outline-none"
+        />
+      </div>
+
+      <!-- 2. Extracto del Artículo -->
+      <div>
+        <div class="flex justify-between items-center mb-1">
+          <label class="font-bold uppercase" for="excerpt">
+            2. Extracto del Artículo (Portada Web) <span class="text-red-700">*</span>:
+          </label>
+          <span class="text-gray-500 text-[10px]">Breve síntesis para el listado principal</span>
+        </div>
+        <textarea
+          id="excerpt"
+          name="excerpt"
+          required
+          rows="3"
+          placeholder="Escribe el extracto para la portada..."
+          class="w-full border-2 border-black p-2 font-serif text-sm bg-[#fafafa] focus:outline-none leading-relaxed"
+        >{defaultExcerpt}</textarea>
+      </div>
+
+      <!-- 3. Fotografía Única (1 Foto Máx) -->
+      <div class="border-2 border-black p-4 bg-gray-50">
+        <div class="flex items-center justify-between mb-2">
+          <label class="font-bold uppercase text-black" for="photoUrl">
+            3. Fotografía Única (1 Foto Máximo)
+          </label>
+          <span class="bg-black text-white text-[10px] px-1.5 py-0.5 uppercase">Regla Editorial</span>
+        </div>
+        <input
+          type="url"
+          id="photoUrl"
+          name="photoUrl"
+          value={article.photoUrl}
+          placeholder="https://..."
+          class="w-full border-2 border-black p-2 bg-white mb-2"
+        />
+        <label class="block font-semibold text-gray-700 mb-1" for="photoCaption">
+          Pie de Foto:
+        </label>
+        <input
+          type="text"
+          id="photoCaption"
+          name="photoCaption"
+          value={article.photoCaption || ''}
+          placeholder="Pie de foto descriptivo..."
+          class="w-full border border-gray-400 p-1.5 bg-white text-xs"
+        />
+      </div>
+
+      <!-- 3. Audio Voice-Note SpeakPipe -->
+      <div class="border-2 border-black p-4 bg-gray-50">
+        <div class="flex items-center justify-between mb-2">
+          <label class="font-bold uppercase text-black" for="speakPipeAudioUrl">
+            3. Nota de Voz de Redacción (SpeakPipe • Máx. 2 Minutos)
+          </label>
+          <a
+            href="https://www.speakpipe.com/voice-recorder"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-red-700 underline font-bold text-[10px]"
+          >
+            Abrir SpeakPipe ↗
+          </a>
+        </div>
+        <input
+          type="url"
+          id="speakPipeAudioUrl"
+          name="speakPipeAudioUrl"
+          value={article.speakPipeAudioUrl || ''}
+          placeholder="https://www.speakpipe.com/..."
+          class="w-full border-2 border-black p-2 bg-white mb-1"
+        />
+      </div>
+
+      <!-- 4. Cuerpo en Markdown (Escribir o Cargar Archivo) -->
+      <div class="border-2 border-black p-4 bg-white">
+        <div class="flex flex-wrap justify-between items-center mb-2 gap-2">
+          <label class="font-bold uppercase text-black" for="content">
+            4. Cuerpo del Artículo (Markdown) <span class="text-red-700">*</span>:
+          </label>
+          <span class="text-gray-500 text-[10px]">Soporta: **negrita**, # subtítulos, > citas</span>
+        </div>
+
+        <!-- Zona de Carga de Archivo Markdown -->
+        <div
+          id="drop-zone"
+          class="border-2 border-dashed border-black bg-gray-50 hover:bg-yellow-50 p-4 mb-3 text-center cursor-pointer transition-colors relative"
+        >
+          <input
+            type="file"
+            id="md-file-input"
+            accept=".md,.markdown,.txt"
+            class="hidden"
+          />
+          <div class="flex flex-col items-center justify-center gap-1">
+            <span class="text-xl">📁</span>
+            <span class="font-bold text-black uppercase text-xs">
+              Subir o sustituir con archivo Markdown (.md o .txt)
+            </span>
+            <span class="text-[10px] text-gray-500">
+              Haz clic para seleccionar o arrastra aquí tu archivo. El texto se volcará en el editor.
+            </span>
+          </div>
+          <div id="file-loaded-info" class="hidden mt-2 p-1.5 bg-green-100 border border-green-800 text-green-900 font-bold text-[11px]"></div>
+        </div>
+
+        <!-- Ayuda rápida de caja destacada flotante -->
+        <div class="flex flex-wrap items-center justify-between gap-2 p-2 mb-2 bg-yellow-100/80 border border-black text-[11px] font-mono">
+          <div class="flex items-center gap-1">
+            <span class="font-bold text-red-700">★ CAJA DESTACADA:</span>
+            <span class="text-gray-800">Caja de texto destacado (web derecha / PDF intercalada):</span>
+            <code class="bg-white px-1 border border-gray-400 font-bold">&gt; [!DESTACADO]</code>
+          </div>
+          <button
+            type="button"
+            id="insert-aside-btn"
+            onclick="insertAsideSnippet()"
+            class="underline font-bold text-black hover:text-red-700 cursor-pointer"
+          >
+            [+ Insertar caja de texto destacado]
+          </button>
+        </div>
+
+        <!-- Editor de texto en Markdown -->
+        <div class="relative">
+          <textarea
+            id="content"
+            name="content"
+            required
+            rows="12"
+            class="w-full border-2 border-black p-3 font-serif text-sm bg-white focus:outline-none leading-relaxed"
+          >{article.content}</textarea>
+        </div>
+      </div>
+
+      <!-- 5. Enlace Fuente Original -->
+      <div class="border-2 border-black p-4 bg-yellow-50">
+        <label class="block font-bold uppercase mb-1 text-black" for="sourceUrl">
+          5. Enlace a Fuente Original (Generará QR en PDF Fanzine):
+        </label>
+        <input
+          type="url"
+          id="sourceUrl"
+          name="sourceUrl"
+          value={article.sourceUrl || ''}
+          placeholder="https://..."
+          class="w-full border-2 border-black p-2 bg-white"
+        />
+      </div>
+
+      <!-- Barra de Acciones -->
+      <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t-2 border-black">
+        <div class="text-[11px] text-gray-600 font-bold uppercase">
+          Estado actual: <span class="text-black font-black">{article.status.toUpperCase()}</span>
+        </div>
+
+        <div class="flex gap-2">
+          <!-- Guardar Cambios (mantiene borrador o actualiza) -->
+          <button
+            type="button"
+            onclick={`saveChanges('${article.status}')`}
+            class="brutal-btn bg-white hover:bg-gray-100"
+          >
+            💾 Guardar Cambios
+          </button>
+
+          <!-- Publicar / Despublicar (Admin únicamente) -->
+          {isAdmin && (
+            <button
+              type="button"
+              onclick={`saveChanges('${article.status === 'published' ? 'draft' : 'published'}')`}
+              class={`brutal-btn ${article.status === 'published' ? 'bg-yellow-300' : 'brutal-btn-primary'}`}
+            >
+              {article.status === 'published' ? 'Despublicar (a Borrador)' : '🚀 Publicar Ahora'}
+            </button>
+          )}
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <script is:inline define:vars={{ articleId: article.id }}>
+    // Manejo de carga de archivo Markdown
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('md-file-input');
+    const fileInfo = document.getElementById('file-loaded-info');
+    const contentTextarea = document.getElementById('content');
+
+    if (dropZone && fileInput) {
+      dropZone.addEventListener('click', () => fileInput.click());
+
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('bg-yellow-200');
+      });
+
+      dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('bg-yellow-200');
+      });
+
+      dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('bg-yellow-200');
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          processMarkdownFile(e.dataTransfer.files[0]);
+        }
+      });
+
+      fileInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+          processMarkdownFile(e.target.files[0]);
+        }
+      });
+    }
+
+    function insertAsideSnippet() {
+      const snippet = `\n\n> [!DESTACADO]\n> Escribe aquí el texto o dato clave que quieres destacar en esta caja.\n\n`;
+      const textarea = document.getElementById('content');
+      if (textarea) {
+        const start = textarea.selectionStart || textarea.value.length;
+        const end = textarea.selectionEnd || textarea.value.length;
+        const before = textarea.value.substring(0, start);
+        const after = textarea.value.substring(end);
+        textarea.value = before + snippet + after;
+        textarea.focus();
+        textarea.setSelectionRange(start + snippet.length, start + snippet.length);
+      }
+    }
+
+    // Exponer a window para llamadas inline y enlazar evento
+    window.insertAsideSnippet = insertAsideSnippet;
+    const insertAsideBtn = document.getElementById('insert-aside-btn');
+    if (insertAsideBtn) {
+      insertAsideBtn.addEventListener('click', insertAsideSnippet);
+    }
+
+    async function processMarkdownFile(file) {
+      if (!file) return;
+      try {
+        const text = await file.text();
+        contentTextarea.value = text;
+
+        const sizeKb = (file.size / 1024).toFixed(1);
+        fileInfo.innerText = `✓ Archivo cargado: "${file.name}" (${sizeKb} KB) — Contenido volcado en el editor.`;
+        fileInfo.classList.remove('hidden');
+
+        // Si el extracto está vacío, sugerir primer párrafo
+        const excerptInput = document.getElementById('excerpt');
+        if (excerptInput && !excerptInput.value.trim()) {
+          const paragraphs = text.split('\n\n').map(p => p.trim()).filter(p => p && !p.startsWith('#'));
+          if (paragraphs.length > 0) {
+            excerptInput.value = paragraphs[0].replace(/[*_#`]/g, '').substring(0, 240);
+          }
+        }
+      } catch (err) {
+        alert('Error al leer el archivo markdown: ' + err.message);
+      }
+    }
+
+    async function saveChanges(status) {
+      const form = document.getElementById('edit-form');
+      const alertBox = document.getElementById('alert-box');
+
+      if (!form.checkValidity()) {
+        alertBox.className = 'mb-4 p-3 border-2 border-red-700 bg-red-100 text-red-900 font-mono text-xs font-bold';
+        alertBox.innerText = '⚠️ Hay campos obligatorios incompletos (Titular, Extracto o Contenido). Por favor revísalos antes de guardar.';
+        alertBox.classList.remove('hidden');
+        form.reportValidity();
+        return;
+      }
+
+      alertBox.classList.add('hidden');
+
+      const payload = {
+        title: document.getElementById('title').value,
+        excerpt: document.getElementById('excerpt').value,
+        content: document.getElementById('content').value,
+        photoUrl: document.getElementById('photoUrl').value,
+        photoCaption: document.getElementById('photoCaption').value,
+        speakPipeAudioUrl: document.getElementById('speakPipeAudioUrl').value,
+        sourceUrl: document.getElementById('sourceUrl').value,
+        status: status,
+      };
+
+      try {
+        const res = await fetch(`/api/articles/${articleId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          const articleUrl = `/articulo/${data.article?.slug || ''}`;
+          alertBox.className = 'mb-4 p-3 border-2 border-green-700 bg-green-100 text-green-900 font-mono text-xs font-bold flex flex-wrap justify-between items-center gap-2';
+          alertBox.innerHTML = `<span>✓ Cambios guardados con éxito. Estado: ${status.toUpperCase()}.</span> <a href="${articleUrl}" target="_blank" class="underline font-black bg-black text-white px-2 py-1 hover:bg-gray-800">👁️ Abrir Artículo en Web ↗</a>`;
+          alertBox.classList.remove('hidden');
+          setTimeout(() => {
+            window.location.href = '/admin';
+          }, 3500);
+        } else {
+          alertBox.className = 'mb-4 p-3 border-2 border-red-700 bg-red-100 text-red-900 font-mono text-xs font-bold';
+          alertBox.innerText = data.error || 'Error al actualizar artículo.';
+          alertBox.classList.remove('hidden');
+        }
+      } catch (e) {
+        alertBox.className = 'mb-4 p-3 border-2 border-red-700 bg-red-100 text-red-900 font-mono text-xs font-bold';
+        alertBox.innerText = 'Error de conexión con el servidor.';
+        alertBox.classList.remove('hidden');
+      }
+    }
+    window.saveChanges = saveChanges;
+  </script>
+</Layout>

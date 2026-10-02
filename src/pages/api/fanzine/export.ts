@@ -5,8 +5,10 @@ export const prerender = false;
 
 export const GET: APIRoute = async ({ url, request }) => {
   try {
-    const origin = url.origin;
-    const targetUrl = `${origin}/print/issue-preview`;
+    const port = process.env.PORT || 4321;
+    const targetUrl = (process.env.NODE_ENV === 'production' || process.env.K_SERVICE)
+      ? `http://127.0.0.1:${port}/print/issue-preview`
+      : `${url.origin}/print/issue-preview`;
 
     console.log(`Generating PDF from: ${targetUrl}`);
     const pdfBuffer = await generateFanzinePdf(targetUrl);

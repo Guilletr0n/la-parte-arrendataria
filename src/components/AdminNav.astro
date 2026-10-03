@@ -1,0 +1,50 @@
+---
+interface Props {
+  activeTab: 'dashboard' | 'articles' | 'users';
+  articleCount?: number;
+  userCount?: number;
+  isUserAdmin: boolean;
+}
+
+const { activeTab, articleCount, userCount, isUserAdmin } = Astro.props;
+---
+
+<div class="flex flex-wrap items-center gap-2 mb-6 font-mono text-xs border-b-2 border-black pb-3">
+  <a
+    href="/admin"
+    class={`px-3 py-1.5 font-bold border-2 border-black transition-colors ${
+      activeTab === 'dashboard'
+        ? 'bg-black text-white shadow-[2px_2px_0px_#000]'
+        : 'bg-white hover:bg-yellow-200 text-black'
+    }`}
+  >
+    📊 Dashboard
+  </a>
+  <a
+    href="/admin/articles"
+    class={`px-3 py-1.5 font-bold border-2 border-black transition-colors ${
+      activeTab === 'articles'
+        ? 'bg-black text-white shadow-[2px_2px_0px_#000]'
+        : 'bg-white hover:bg-yellow-200 text-black'
+    }`}
+  >
+    📝 Artículos {articleCount !== undefined ? `(${articleCount})` : ''}
+  </a>
+  {isUserAdmin && (
+    <a
+      href="/admin/users"
+      class={`px-3 py-1.5 font-bold border-2 border-black transition-colors ${
+        activeTab === 'users'
+          ? 'bg-black text-white shadow-[2px_2px_0px_#000]'
+          : 'bg-white hover:bg-yellow-200 text-black'
+      }`}
+    >
+      👥 Usuarias {userCount !== undefined ? `(${userCount})` : ''}
+    </a>
+  )}
+  <div class="ml-auto flex items-center gap-2">
+    <a href="/admin/new-article" class="brutal-btn brutal-btn-primary py-1 px-3 text-xs font-bold">
+      + Redactar Artículo
+    </a>
+  </div>
+</div>

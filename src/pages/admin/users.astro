@@ -1,7 +1,8 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import AdminNav from '../../components/AdminNav.astro';
-import { getCurrentUser, canPublish, canDelete, canExportPdf, canManageUsers } from '../../lib/auth';
+import Pagination from '../../components/Pagination.astro';
+import { getCurrentUser, canManageUsers } from '../../lib/auth';
 import { getArticles } from '../../lib/db';
 import { getUsers } from '../../lib/users';
 
@@ -13,30 +14,14 @@ if (!user) {
 }
 
 const isUserAdmin = canManageUsers(user);
-const isUserEditor = user.role === 'editor';
-const isUserReader = user.role === 'reader';
 
-// Fetch users if admin
-const allUsers = isUserAdmin ? await getUsers() : [];
+// Only administrators can manage users
+if (!isUserAdmin) {
+  return Astro.redirect('/admin');
+}
 
-// Fetch articles: editors ONLY see their own articles; admins see all
+const allUsers = await getUsers();
 const allArticles = await getArticles();
-const visibleArticles = isUserEditor
-  ? allArticles.filter(a => a.authorUid === user.uid)
-  : allArticles;
-
-const publishedArticles = visibleArticles.filter(a => a.status === 'published');
-const draftArticles = visibleArticles.filter(a => a.status === 'draft');
-const selectedForPrintArticles = visibleArticles.filter(a => a.selectedForPrint);
-
-// Dashboard slices: Maximum of 10 articles and 10 users as requested
-const dashboardArticles = visibleArticles.slice(0, 10);
-const dashboardUsers = allUsers.slice(0, 10);
-
-// Calculate user role statistics for admin
-const adminCount = allUsers.filter(u => u.role === 'admin').length;
-const editorCount = allUsers.filter(u => u.role === 'editor').length;
-const readerCount = allUsers.filter(u => u.role === 'reader').length;
 
 // Count articles per author
 const articleCountByAuthor = new Map<string, number>();
@@ -45,15 +30,26 @@ allArticles.forEach(a => {
     articleCountByAuthor.set(a.authorUid, (articleCountByAuthor.get(a.authorUid) || 0) + 1);
   }
 });
+
+// Role stats
+const adminCount = allUsers.filter(u => u.role === 'admin').length;
+const editorCount = allUsers.filter(u => u.role === 'editor').length;
+const readerCount = allUsers.filter(u => u.role === 'reader').length;
+
+// Pagination logic: max 20 users per page
+const PAGE_SIZE = 20;
+const pageParam = Astro.url.searchParams.get('page');
+const currentPage = Math.max(1, parseInt(pageParam || '1', 10));
+const totalUsers = allUsers.length;
+const totalPages = Math.ceil(totalUsers / PAGE_SIZE) || 1;
+const paginatedUsers = allUsers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 ---
 
-<Layout title="Panel CMS | La Parte Arrendataria" maxWidth="max-w-[950px]">
+<Layout title="Gestión de Usuarias | La Parte Arrendataria" maxWidth="max-w-[950px]">
   <!-- Top Bar: User info & Logout -->
-  <div class="border-2 border-black bg-white p-3 mb-6 flex flex-wrap justify-between items-center font-mono text-xs shadow-[3px_3px_0px_#000]">
+  <div class="border-2 border-black bg-white p-3 mb-4 flex flex-wrap justify-between items-center font-mono text-xs shadow-[3px_3px_0px_#000]">
     <div class="flex items-center gap-2">
-      <span class={`px-2 py-0.5 font-bold uppercase text-white ${
-        isUserAdmin ? 'bg-red-700' : isUserEditor ? 'bg-blue-800' : 'bg-gray-700'
-      }`}>
+      <span class="px-2 py-0.5 font-bold uppercase text-white bg-red-700">
         ROL: {user.role.toUpperCase()}
       </span>
       <span class="font-bold text-black">{user.displayName}</span>
@@ -72,423 +68,149 @@ allArticles.forEach(a => {
     </div>
   </div>
 
-  <!-- Vista para Aspirantes a Editora / Solicitudes en espera de aprobación -->
-  {isUserReader && (
-    <div class="border-[3px] border-black bg-white shadow-[6px_6px_0px_#000] p-6 sm:p-8 font-mono text-center my-6">
-      <div class="inline-block p-3 bg-yellow-300 border-2 border-black mb-3 text-3xl select-none">
-        ⏳ ✊🏼
-      </div>
-      <h2 class="text-2xl font-serif font-black uppercase tracking-tight mb-2 text-black">
-        Solicitud de Editora en Espera de Aprobación
-      </h2>
-      <p class="text-xs sm:text-sm text-gray-800 max-w-lg mx-auto mb-4 leading-relaxed">
-        ¡Bienvenida a la asamblea, <strong>{user.displayName}</strong>! Tu postulación para unirte al equipo de redacción ha sido registrada correctamente.
-      </p>
+  <!-- Admin Navigation Tabs -->
+  <AdminNav
+    activeTab="users"
+    articleCount={allArticles.length}
+    userCount={allUsers.length}
+    isUserAdmin={isUserAdmin}
+  />
 
-      <div class="p-4 bg-yellow-100 border-2 border-black text-xs max-w-lg mx-auto mb-6 text-left shadow-[3px_3px_0px_#000] space-y-2">
-        <div class="font-bold uppercase text-red-700 flex items-center gap-1.5">
-          <span>★</span>
-          <span>Estado: Pendiente de Validación por el Comité Editorial</span>
-        </div>
-        <p class="text-gray-800 leading-normal">
-          Para garantizar la coordinación asamblearia, una <strong>administradora</strong> debe asignarte el rol oficial de <strong>Editora</strong> desde su panel de control antes de que puedas redactar, editar y subir artículos al fanzine.
-        </p>
-        <p class="text-gray-700 border-t border-gray-400 pt-2 font-semibold">
-          Mientras se aprueba tu solicitud, tu cuenta identificada te permite participar democráticamente apoyando artículos en la portada y el archivo (1 voto por artículo en todas las publicaciones que desees).
-        </p>
+  <!-- SECCIÓN: Panel de Usuarias Autorizadas -->
+  <div class="border-[3px] border-black bg-white shadow-[5px_5px_0px_#000] p-4 mb-8">
+    <div class="flex flex-wrap justify-between items-center border-b-2 border-black pb-2 mb-4 font-mono gap-2">
+      <div>
+        <span class="text-[10px] font-bold uppercase text-red-700 block tracking-wider">
+          CONTROL DE ACCESO Y ROLES
+        </span>
+        <h1 class="text-lg font-black uppercase tracking-tight m-0">
+          Usuarias Autorizadas de la Asamblea
+        </h1>
       </div>
-
-      <div class="flex flex-col sm:flex-row justify-center gap-3">
-        <a href="/" class="brutal-btn brutal-btn-primary text-xs font-bold py-2 px-4">
-          Ir a la Portada a Votar Propuestas ✊🏼
-        </a>
+      <div class="flex items-center gap-2">
+        <span class="bg-black text-white px-2 py-0.5 text-xs font-bold">
+          {totalUsers} usuarias
+        </span>
         <button
           type="button"
-          onclick="document.getElementById('change-password-modal').showModal()"
-          class="brutal-btn bg-yellow-200 hover:bg-yellow-300 text-xs font-bold py-2 px-4"
+          onclick="document.getElementById('create-user-modal').showModal()"
+          class="brutal-btn text-xs bg-yellow-300 font-bold py-1 px-3"
         >
-          🔑 Cambiar Contraseña
+          + Nueva Usuaria
         </button>
-        <a href="/api/auth/logout" class="brutal-btn bg-white hover:bg-gray-100 text-xs font-bold py-2 px-4">
-          Cerrar Sesión
-        </a>
       </div>
     </div>
-  )}
 
-  <!-- Vista para Editoras y Administradoras -->
-  {!isUserReader && (
-    <>
-      <!-- Admin Navigation Tabs -->
-      <AdminNav
-        activeTab="dashboard"
-        articleCount={visibleArticles.length}
-        userCount={allUsers.length}
-        isUserAdmin={isUserAdmin}
-      />
-
-      <!-- Role Notice / Instructions for Editors -->
-      {isUserEditor && (
-        <div class="p-3 mb-6 bg-blue-50 border-2 border-blue-900 font-mono text-xs text-blue-900 shadow-[3px_3px_0px_#000]">
-          <strong>MODO EDITOR:</strong> Tienes permisos para crear nuevos borradores y editar <strong>únicamente los artículos redactados por ti</strong> ({visibleArticles.length} artículos). La publicación oficial en portada, asignación para el fanzine impreso y administración corresponden al Comité Editorial (Admin).
-        </div>
-      )}
-
-      <!-- Quick Action & Stats Cards -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6 font-mono text-xs">
-        <div class="border-2 border-black p-3 bg-white shadow-[3px_3px_0px_#000]">
-          <span class="text-gray-500 block uppercase">
-            {isUserEditor ? 'Tus Artículos' : 'Total Artículos'}
-          </span>
-          <span class="text-2xl font-black">{visibleArticles.length}</span>
-        </div>
-        <div class="border-2 border-black p-3 bg-white shadow-[3px_3px_0px_#000]">
-          <span class="text-gray-500 block uppercase">Publicados</span>
-          <span class="text-2xl font-black text-green-700">{publishedArticles.length}</span>
-        </div>
-        <div class="border-2 border-black p-3 bg-white shadow-[3px_3px_0px_#000]">
-          <span class="text-gray-500 block uppercase">Borradores</span>
-          <span class="text-2xl font-black text-yellow-700">{draftArticles.length}</span>
-        </div>
-        <div class="border-2 border-black p-3 bg-white shadow-[3px_3px_0px_#000]">
-          <span class="text-gray-500 block uppercase">Para Fanzine</span>
-          <span class="text-2xl font-black text-red-700">{selectedForPrintArticles.length}</span>
-        </div>
+    <!-- Resumen de Roles -->
+    <div class="grid grid-cols-3 gap-2 mb-4 font-mono text-xs">
+      <div class="border border-black p-2 bg-red-50">
+        <span class="text-gray-600 block text-[10px] uppercase font-bold">Admins</span>
+        <span class="text-lg font-black text-red-700">{adminCount}</span>
       </div>
-
-      <!-- Actions Toolbar -->
-      <div class="flex flex-wrap gap-3 mb-6">
-        <a href="/admin/new-article" class="brutal-btn brutal-btn-primary text-xs">
-          + Redactar Nuevo Artículo
-        </a>
-        {isUserAdmin && (
-          <>
-            <a href="/admin/export-fanzine" class="brutal-btn text-xs bg-yellow-300">
-              ⚡ Confeccionar Fanzine PDF
-            </a>
-            <a href="/print/issue-preview" target="_blank" class="brutal-btn text-xs">
-              👁️ Vista Previa 3 Col
-            </a>
-            <a href="/api/fanzine/export" class="brutal-btn text-xs bg-red-600 text-white hover:bg-red-700">
-              📥 Descarga Directa PDF
-            </a>
-            <button
-              type="button"
-              onclick="document.getElementById('create-user-modal').showModal()"
-              class="brutal-btn text-xs bg-black text-white hover:bg-gray-800"
-            >
-              + Alta Nueva Usuaria
-            </button>
-          </>
-        )}
+      <div class="border border-black p-2 bg-blue-50">
+        <span class="text-gray-600 block text-[10px] uppercase font-bold">Editoras</span>
+        <span class="text-lg font-black text-blue-800">{editorCount}</span>
       </div>
-
-      <!-- SECCIÓN 1: Catálogo de Artículos (Dashboard: últimos 10) -->
-      <div class="border-[3px] border-black bg-white shadow-[5px_5px_0px_#000] p-4 mb-8">
-        <div class="flex flex-wrap justify-between items-center border-b-2 border-black pb-2 mb-4 font-mono gap-2">
-          <div>
-            <h2 class="text-lg font-black uppercase tracking-tight m-0">
-              {isUserAdmin ? 'Artículos Recientes' : 'Tus Artículos Recientes'}
-            </h2>
-            <span class="text-[10px] text-gray-500 uppercase">
-              {visibleArticles.length > 10 ? `Mostrando los últimos 10 de ${visibleArticles.length} artículos` : `${visibleArticles.length} artículos`}
-            </span>
-          </div>
-          <a
-            href="/admin/articles"
-            class="brutal-btn bg-black text-white hover:bg-yellow-300 hover:text-black text-xs font-bold py-1 px-3"
-          >
-            Ver todos los artículos ({visibleArticles.length}) →
-          </a>
-        </div>
-
-        {visibleArticles.length === 0 ? (
-          <div class="border-2 border-dashed border-gray-400 p-8 text-center font-mono text-xs">
-            <p class="font-bold text-gray-700 uppercase mb-2">No has redactado artículos todavía</p>
-            <p class="text-gray-500 mb-4">Pulsa en el botón superior para enviar tu primer texto a la redacción.</p>
-            <a href="/admin/new-article" class="brutal-btn brutal-btn-primary text-xs">+ Redactar Nuevo Artículo</a>
-          </div>
-        ) : (
-          <div class="overflow-x-auto">
-            <table class="w-full text-left font-mono text-xs border-collapse">
-              <thead>
-                <tr class="border-b-2 border-black bg-gray-100 uppercase">
-                  <th class="p-2">Estado</th>
-                  <th class="p-2">Título / Autor</th>
-                  <th class="p-2">Votos ✊🏼</th>
-                  <th class="p-2">Multimedia</th>
-                  <th class="p-2">Fanzine</th>
-                  <th class="p-2 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dashboardArticles.map((art) => (
-                  <tr class="border-b border-gray-300 hover:bg-yellow-50">
-                    <!-- Estado -->
-                    <td class="p-2 whitespace-nowrap">
-                      {art.status === 'published' ? (
-                        <span class="bg-green-100 text-green-900 border border-green-800 px-1.5 py-0.5 font-bold">
-                          PUBLICADO
-                        </span>
-                      ) : (
-                        <span class="bg-yellow-100 text-yellow-900 border border-yellow-800 px-1.5 py-0.5 font-bold">
-                          BORRADOR
-                        </span>
-                      )}
-                    </td>
-
-                    <!-- Título & Autor -->
-                    <td class="p-2">
-                      <a
-                        href={`/articulo/${art.slug}`}
-                        target="_blank"
-                        class="font-bold text-black hover:text-red-700 hover:underline inline-flex items-center gap-1"
-                        title="Abrir artículo completo en la web"
-                      >
-                        <span>{art.title}</span>
-                        <span class="text-[10px] text-gray-500">↗</span>
-                      </a>
-                      <span class="text-[10px] text-gray-500 block">
-                        Por {art.author} ({art.authorRole}) • {new Date(art.createdAt).toLocaleDateString('es-ES')}
-                      </span>
-                    </td>
-
-                    <!-- Votos Populares -->
-                    <td class="p-2 whitespace-nowrap">
-                      <span class="bg-yellow-300 border border-black px-1.5 py-0.5 font-bold text-[11px]">
-                        ✊🏼 {art.votes || 0}
-                      </span>
-                    </td>
-
-                    <!-- Multimedia -->
-                    <td class="p-2 text-[10px] whitespace-nowrap">
-                      <div>📷 {art.photoUrl ? '1 Foto asignada' : 'Sin foto'}</div>
-                      <div>🎙️ {(art.audioUrl || art.speakPipeAudioUrl) ? 'Nota de voz' : 'Sin audio'}</div>
-                    </td>
-
-                    <!-- Fanzine Print indicator -->
-                    <td class="p-2 whitespace-nowrap">
-                      {art.selectedForPrint ? (
-                        <span class="bg-black text-white px-1.5 py-0.5 font-bold text-[10px]">
-                          ★ #{art.printOrder || 1} ({art.fanzineCategory?.toUpperCase() || 'INTERIOR'})
-                        </span>
-                      ) : (
-                        <span class="text-gray-400">—</span>
-                      )}
-                    </td>
-
-                    <!-- Actions -->
-                    <td class="p-2 text-right space-x-1 whitespace-nowrap">
-                      <a
-                        href={`/articulo/${art.slug}`}
-                        target="_blank"
-                        class="inline-block border border-black px-2 py-1 bg-yellow-100 hover:bg-yellow-300 font-bold text-black"
-                        title="Ver en web"
-                      >
-                        👁️
-                      </a>
-
-                      <a
-                        href={`/admin/edit/${art.id}`}
-                        class="inline-block border border-black px-2 py-1 bg-white hover:bg-black hover:text-white font-bold"
-                      >
-                        Editar
-                      </a>
-
-                      {isUserAdmin && (
-                        <>
-                          <button
-                            onclick={`togglePublish('${art.id}', '${art.status === 'published' ? 'draft' : 'published'}')`}
-                            class={`border border-black px-2 py-1 font-bold ${
-                              art.status === 'published'
-                                ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-900'
-                                : 'bg-green-100 hover:bg-green-200 text-green-900'
-                            }`}
-                          >
-                            {art.status === 'published' ? 'Pausar' : 'Publicar'}
-                          </button>
-
-                          <button
-                            onclick={`deleteArticleConfirm('${art.id}', '${art.title}')`}
-                            class="border border-black px-2 py-1 bg-red-100 hover:bg-red-600 hover:text-white font-bold text-red-900"
-                          >
-                            Borrar
-                          </button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Link to full articles page -->
-          <div class="mt-4 pt-3 border-t-2 border-black flex flex-wrap justify-between items-center font-mono text-xs gap-2">
-            <span class="text-gray-600">
-              {visibleArticles.length > 10 ? `Mostrando los 10 artículos más recientes de ${visibleArticles.length}.` : `${visibleArticles.length} artículos en total.`}
-            </span>
-            <a
-              href="/admin/articles"
-              class="brutal-btn bg-black text-white hover:bg-yellow-300 hover:text-black py-1.5 px-4 font-bold inline-flex items-center gap-1 shadow-[2px_2px_0px_#000]"
-            >
-              <span>Ver todos los artículos ({visibleArticles.length})</span>
-              <span>→</span>
-            </a>
-          </div>
-        )}
+      <div class="border border-black p-2 bg-yellow-50">
+        <span class="text-gray-600 block text-[10px] uppercase font-bold">Aspirantes (Pendientes)</span>
+        <span class="text-lg font-black text-yellow-800">{readerCount}</span>
       </div>
+    </div>
 
-      <!-- SECCIÓN 2: Panel de Usuarias Autorizadas (Solo Admin) -->
-      {isUserAdmin && (
-        <div class="border-[3px] border-black bg-white shadow-[5px_5px_0px_#000] p-4 mb-8">
-          <div class="flex flex-wrap justify-between items-center border-b-2 border-black pb-2 mb-4 font-mono gap-2">
-            <div>
-              <span class="text-[10px] font-bold uppercase text-red-700 block tracking-wider">
-                CONTROL DE ACCESO Y ROLES
-              </span>
-              <h2 class="text-lg font-black uppercase tracking-tight m-0">
-                Usuarias de la Asamblea
-              </h2>
-              <span class="text-[10px] text-gray-500 uppercase">
-                {allUsers.length > 10 ? `Mostrando 10 de ${allUsers.length} usuarias` : `${allUsers.length} usuarias`}
-              </span>
-            </div>
-            <div class="flex items-center gap-2">
-              <a
-                href="/admin/users"
-                class="brutal-btn bg-black text-white hover:bg-yellow-300 hover:text-black text-xs font-bold py-1 px-3"
-              >
-                Ver todas las usuarias ({allUsers.length}) →
-              </a>
-              <button
-                type="button"
-                onclick="document.getElementById('create-user-modal').showModal()"
-                class="brutal-btn text-xs bg-yellow-300 font-bold py-1 px-3"
-              >
-                + Nueva Usuaria
-              </button>
-            </div>
-          </div>
+    <!-- Tabla de Usuarias -->
+    <div class="overflow-x-auto">
+      <table class="w-full text-left font-mono text-xs border-collapse">
+        <thead>
+          <tr class="border-b-2 border-black bg-gray-100 uppercase">
+            <th class="p-2">Firma Pública</th>
+            <th class="p-2">Email</th>
+            <th class="p-2">Rol Asignado</th>
+            <th class="p-2">Artículos</th>
+            <th class="p-2 text-right">Gestión</th>
+          </tr>
+        </thead>
+        <tbody>
+          {paginatedUsers.map((u) => {
+            const authoredCount = articleCountByAuthor.get(u.uid) || 0;
+            return (
+              <tr class="border-b border-gray-300 hover:bg-yellow-50 cursor-pointer" onclick={`openManageUserModal(${JSON.stringify(u)}, ${authoredCount})`}>
+                <!-- Nombre -->
+                <td class="p-2 font-bold text-black">
+                  {u.displayName}
+                  {u.uid === user.uid && (
+                    <span class="text-[10px] text-gray-500 font-normal ml-1">(Tú)</span>
+                  )}
+                </td>
 
-          <!-- Resumen de Roles -->
-          <div class="grid grid-cols-3 gap-2 mb-4 font-mono text-xs">
-            <div class="border border-black p-2 bg-red-50">
-              <span class="text-gray-600 block text-[10px] uppercase font-bold">Admins</span>
-              <span class="text-lg font-black text-red-700">{adminCount}</span>
-            </div>
-            <div class="border border-black p-2 bg-blue-50">
-              <span class="text-gray-600 block text-[10px] uppercase font-bold">Editoras</span>
-              <span class="text-lg font-black text-blue-800">{editorCount}</span>
-            </div>
-            <div class="border border-black p-2 bg-yellow-50">
-              <span class="text-gray-600 block text-[10px] uppercase font-bold">Aspirantes (Pendientes)</span>
-              <span class="text-lg font-black text-yellow-800">{readerCount}</span>
-            </div>
-          </div>
+                <!-- Email -->
+                <td class="p-2 text-gray-700">
+                  {u.email}
+                </td>
 
-          <!-- Tabla de Usuarias (Dashboard: máx 10) -->
-          <div class="overflow-x-auto">
-            <table class="w-full text-left font-mono text-xs border-collapse">
-              <thead>
-                <tr class="border-b-2 border-black bg-gray-100 uppercase">
-                  <th class="p-2">Firma Pública</th>
-                  <th class="p-2">Email</th>
-                  <th class="p-2">Rol Asignado</th>
-                  <th class="p-2">Artículos</th>
-                  <th class="p-2 text-right">Gestión</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dashboardUsers.map((u) => {
-                  const authoredCount = articleCountByAuthor.get(u.uid) || 0;
-                  return (
-                    <tr class="border-b border-gray-300 hover:bg-yellow-50 cursor-pointer" onclick={`openManageUserModal(${JSON.stringify(u)}, ${authoredCount})`}>
-                      <!-- Nombre -->
-                      <td class="p-2 font-bold text-black">
-                        {u.displayName}
-                        {u.uid === user.uid && (
-                          <span class="text-[10px] text-gray-500 font-normal ml-1">(Tú)</span>
-                        )}
-                      </td>
+                <!-- Rol -->
+                <td class="p-2 whitespace-nowrap">
+                  {u.role === 'admin' && (
+                    <span class="bg-red-700 text-white font-bold px-2 py-0.5 text-[10px]">
+                      ADMINISTRADORA
+                    </span>
+                  )}
+                  {u.role === 'editor' && (
+                    <span class="bg-blue-800 text-white font-bold px-2 py-0.5 text-[10px]">
+                      EDITORA
+                    </span>
+                  )}
+                  {u.role === 'reader' && (
+                    <span class="bg-yellow-200 text-yellow-900 border border-yellow-700 font-bold px-2 py-0.5 text-[10px] inline-flex items-center gap-1">
+                      <span>⏳</span>
+                      <span>ASPIRANTE (Pendiente)</span>
+                    </span>
+                  )}
+                </td>
 
-                      <!-- Email -->
-                      <td class="p-2 text-gray-700">
-                        {u.email}
-                      </td>
+                <!-- Artículos -->
+                <td class="p-2 whitespace-nowrap">
+                  <span class="font-bold">{authoredCount}</span>
+                </td>
 
-                      <!-- Rol -->
-                      <td class="p-2 whitespace-nowrap">
-                        {u.role === 'admin' && (
-                          <span class="bg-red-700 text-white font-bold px-2 py-0.5 text-[10px]">
-                            ADMINISTRADORA
-                          </span>
-                        )}
-                        {u.role === 'editor' && (
-                          <span class="bg-blue-800 text-white font-bold px-2 py-0.5 text-[10px]">
-                            EDITORA
-                          </span>
-                        )}
-                        {u.role === 'reader' && (
-                          <span class="bg-yellow-200 text-yellow-900 border border-yellow-700 font-bold px-2 py-0.5 text-[10px] inline-flex items-center gap-1">
-                            <span>⏳</span>
-                            <span>ASPIRANTE (Pendiente)</span>
-                          </span>
-                        )}
-                      </td>
+                <!-- Acciones -->
+                <td class="p-2 text-right space-x-1" onclick="event.stopPropagation()">
+                  {u.role === 'reader' && (
+                    <button
+                      type="button"
+                      onclick={`approveAsEditor('${u.uid}', '${u.displayName}')`}
+                      class="brutal-btn bg-yellow-300 hover:bg-yellow-400 text-black text-xs py-1 px-2.5 font-bold inline-flex items-center gap-1 shadow-[2px_2px_0px_#000]"
+                      title="Aprobar inmediatamente como Editora"
+                    >
+                      <span>★</span>
+                      <span>Aprobar Editora</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onclick={`openManageUserModal(${JSON.stringify(u)}, ${authoredCount})`}
+                    class="brutal-btn text-xs py-1 px-2.5 font-bold"
+                  >
+                    ⚙️ Gestionar
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
 
-                      <!-- Artículos -->
-                      <td class="p-2 whitespace-nowrap">
-                        <span class="font-bold">{authoredCount}</span>
-                      </td>
+    <!-- Paginación de Usuarias -->
+    <Pagination
+      currentPage={currentPage}
+      totalPages={totalPages}
+      totalItems={totalUsers}
+      itemLabel="usuarias"
+      baseUrl="/admin/users"
+    />
+  </div>
 
-                      <!-- Acciones -->
-                      <td class="p-2 text-right space-x-1" onclick="event.stopPropagation()">
-                        {u.role === 'reader' && (
-                          <button
-                            type="button"
-                            onclick={`approveAsEditor('${u.uid}', '${u.displayName}')`}
-                            class="brutal-btn bg-yellow-300 hover:bg-yellow-400 text-black text-xs py-1 px-2.5 font-bold inline-flex items-center gap-1 shadow-[2px_2px_0px_#000]"
-                            title="Aprobar inmediatamente como Editora"
-                          >
-                            <span>★</span>
-                            <span>Aprobar Editora</span>
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onclick={`openManageUserModal(${JSON.stringify(u)}, ${authoredCount})`}
-                          class="brutal-btn text-xs py-1 px-2.5 font-bold"
-                        >
-                          ⚙️ Gestionar
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Link to full users page -->
-          <div class="mt-4 pt-3 border-t-2 border-black flex flex-wrap justify-between items-center font-mono text-xs gap-2">
-            <span class="text-gray-600">
-              {allUsers.length > 10 ? `Mostrando 10 de ${allUsers.length} usuarias registradas.` : `${allUsers.length} usuarias en total.`}
-            </span>
-            <a
-              href="/admin/users"
-              class="brutal-btn bg-black text-white hover:bg-yellow-300 hover:text-black py-1.5 px-4 font-bold inline-flex items-center gap-1 shadow-[2px_2px_0px_#000]"
-            >
-              <span>Ver todas las usuarias ({allUsers.length})</span>
-              <span>→</span>
-            </a>
-          </div>
-        </div>
-      )}
-    </>
-  )}
-
-  <!-- MODAL: GESTIÓN DE USUARIA (Admin only) -->
+  <!-- MODAL: GESTIÓN DE USUARIA -->
   <dialog
     id="user-manage-modal"
     class="fixed inset-0 m-auto p-0 border-4 border-black bg-white shadow-[8px_8px_0px_#000] max-w-lg w-[92%] backdrop:bg-black/75 z-50 overflow-hidden font-mono"
@@ -520,7 +242,7 @@ allArticles.forEach(a => {
         <!-- 1. Nombre / Firma -->
         <div>
           <label class="block font-bold uppercase mb-1" for="edit-user-name">
-            Nombre / Firma con la que aparece publicado:
+            Nombre / Firma pública:
           </label>
           <input
             type="text"
@@ -528,12 +250,9 @@ allArticles.forEach(a => {
             required
             class="w-full border-2 border-black p-2 bg-[#fdfdfd] focus:outline-none focus:ring-2 focus:ring-black"
           />
-          <span class="text-[10px] text-gray-500 block mt-0.5">
-            Al cambiar este nombre, se actualizará automáticamente la firma de todos sus artículos redactados.
-          </span>
         </div>
 
-        <!-- 2. Correo Electrónico -->
+        <!-- 2. Email -->
         <div>
           <label class="block font-bold uppercase mb-1" for="edit-user-email">
             Correo Electrónico:
@@ -625,7 +344,7 @@ allArticles.forEach(a => {
     </div>
   </dialog>
 
-  <!-- MODAL: ALTA DE NUEVA USUARIA (Admin only) -->
+  <!-- MODAL: ALTA DE NUEVA USUARIA -->
   <dialog
     id="create-user-modal"
     class="fixed inset-0 m-auto p-0 border-4 border-black bg-white shadow-[8px_8px_0px_#000] max-w-lg w-[92%] backdrop:bg-black/75 z-50 overflow-hidden font-mono"
@@ -726,7 +445,7 @@ allArticles.forEach(a => {
     </div>
   </dialog>
 
-  <!-- MODAL: CAMBIAR CONTRASEÑA (Para cualquier usuaria autenticada) -->
+  <!-- MODAL: CAMBIAR CONTRASEÑA -->
   <dialog
     id="change-password-modal"
     class="fixed inset-0 m-auto p-0 border-4 border-black bg-white shadow-[8px_8px_0px_#000] max-w-md w-[92%] backdrop:bg-black/75 z-50 overflow-hidden font-mono"
@@ -815,44 +534,6 @@ allArticles.forEach(a => {
   </dialog>
 
   <script is:inline>
-    // --- Article Actions ---
-    async function togglePublish(id, newStatus) {
-      if (!confirm(`¿Deseas cambiar el estado a ${newStatus.toUpperCase()}?`)) return;
-      try {
-        const res = await fetch(`/api/articles/${id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: newStatus }),
-        });
-        if (res.ok) {
-          window.location.reload();
-        } else {
-          const err = await res.json();
-          alert('Error: ' + (err.error || 'No se pudo actualizar'));
-        }
-      } catch (e) {
-        alert('Error de conexión');
-      }
-    }
-
-    async function deleteArticleConfirm(id, title) {
-      if (!confirm(`¿ELIMINAR DEFINITIVAMENTE el artículo "${title}"?`)) return;
-      try {
-        const res = await fetch(`/api/articles/${id}`, {
-          method: 'DELETE',
-        });
-        if (res.ok) {
-          window.location.reload();
-        } else {
-          const err = await res.json();
-          alert('Error: ' + (err.error || 'No se pudo eliminar'));
-        }
-      } catch (e) {
-        alert('Error de conexión');
-      }
-    }
-
-    // --- User Management Modal Logic ---
     let currentSelectedUser = null;
 
     function openManageUserModal(userData, articleCount) {
@@ -964,18 +645,15 @@ allArticles.forEach(a => {
       }
     });
 
-    // Delete User with Auto Reassignment
+    // Delete User
     async function handleDeleteUser() {
       if (!currentSelectedUser) return;
-      const { uid, displayName } = currentSelectedUser;
+      const uid = currentSelectedUser.uid;
+      const name = currentSelectedUser.displayName;
 
       const confirmed = confirm(
-        `¿CONFIRMAS LA ELIMINACIÓN DE LA USUARIA "${displayName}"?\n\n` +
-        `• Todos los artículos redactados por esta usuaria se reasignarán automáticamente al Comité Editorial (Admin).\n` +
-        `• La cuenta dejará de poder acceder al sistema.\n\n` +
-        `¿Deseas continuar?`
+        `¿Estás SEGURA de eliminar la cuenta de "${name}"?\n\nSus artículos NO se borrarán: serán reasignados automáticamente a tu cuenta de Administradora.`
       );
-
       if (!confirmed) return;
 
       const deleteBtn = document.getElementById('delete-user-btn');

@@ -4,8 +4,6 @@ steps:
     args:
       - 'build'
       - '--tag'
-      - 'gcr.io/$PROJECT_ID/la-parte-arrendataria:$COMMIT_SHA'
-      - '--tag'
       - 'gcr.io/$PROJECT_ID/la-parte-arrendataria:latest'
       - '.'
 

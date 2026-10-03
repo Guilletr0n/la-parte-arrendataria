@@ -1,0 +1,497 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Header from '../components/Header.astro';
+import { getArticles } from '../lib/db';
+
+export const prerender = false;
+
+// Query published articles
+const allArticles = await getArticles({ status: 'published', sortBy: 'blended' });
+
+// Filter only articles with a valid audio note
+const audioArticles = allArticles.filter(article => {
+  const url = article.audioUrl || article.speakPipeAudioUrl;
+  return typeof url === 'string' && url.trim().length > 0 && !url.includes('speakpipe.com');
+});
+---
+
+<Layout
+  title="Playlist de Notas de Voz | La Parte Arrendataria"
+  description="Playlist continua de notas de voz de 2 minutos sobre derecho a la vivienda y contrainformación inquilina."
+>
+  <!-- Cabecera de la Publicación -->
+  <Header />
+
+  <!-- Encabezado de Sección: Playlist Brutalista -->
+  <section class="border-2 border-black bg-white p-4 mb-6 shadow-[4px_4px_0px_#000] font-mono">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+      <div class="flex items-center gap-2">
+        <span class="bg-red-600 text-white font-black px-2 py-0.5 text-xs uppercase tracking-wider animate-pulse">
+          ● AUDIO FEED
+        </span>
+        <h1 class="text-sm font-black uppercase tracking-tight text-black m-0">
+          PLAYLIST DE NOTAS DE VOZ (MÁX. 2 MIN.)
+        </h1>
+      </div>
+      <span class="bg-black text-white px-2 py-0.5 text-[11px] font-bold">
+        {audioArticles.length} {audioArticles.length === 1 ? 'NOTA DISPONIBLE' : 'NOTAS DISPONIBLES'}
+      </span>
+    </div>
+    <p class="text-xs text-gray-800 leading-relaxed m-0 font-sans">
+      Crónicas habladas de urgencia, comunicados de asambleas y testimonios directos de inquilinas en lucha.
+      Escucha las notas en reproducción continuada o individual.
+    </p>
+  </section>
+
+  <!-- Panel de Control y Toggle al Principio del Listado -->
+  <section class="border-2 border-black bg-yellow-100 p-4 mb-6 shadow-[4px_4px_0px_#000] font-mono">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <!-- Master Play / Pause Button -->
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          id="master-play-btn"
+          class="brutal-btn brutal-btn-primary inline-flex items-center gap-2 px-3 py-2 text-xs font-black tracking-wider uppercase cursor-pointer"
+          aria-label="Reproducir playlist completa"
+        >
+          <span id="master-play-icon" class="text-sm select-none" style="font-family: system-ui, -apple-system, sans-serif; margin-right: 2px;">▶</span>
+          <span id="master-play-text">REPRODUCIR PLAYLIST</span>
+        </button>
+
+        <button
+          type="button"
+          id="prev-track-btn"
+          class="brutal-btn px-2 py-2 text-xs font-bold bg-white text-black hover:bg-gray-100 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          title="Pista anterior"
+          disabled
+        >
+          ⏮
+        </button>
+        <button
+          type="button"
+          id="next-track-btn"
+          class="brutal-btn px-2 py-2 text-xs font-bold bg-white text-black hover:bg-gray-100 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          title="Pista siguiente"
+          disabled
+        >
+          ⏭
+        </button>
+      </div>
+
+      <!-- BOTÓN TOGGLE (Cambia de icono al pulsar - NO es un switch tradicional) -->
+      <div class="flex items-center gap-2">
+        <span class="text-[11px] font-bold text-gray-700 uppercase hidden sm:inline">Modo:</span>
+        <button
+          type="button"
+          id="mode-toggle-btn"
+          class="brutal-btn px-3 py-2 text-xs font-black bg-white hover:bg-black hover:text-white transition-colors inline-flex items-center gap-2 border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none cursor-pointer"
+          data-mode="continuous"
+          aria-pressed="true"
+          title="Pulsa para alternar entre modo continuo o modo nota única"
+        >
+          <span id="mode-icon" class="text-sm select-none" style="font-family: system-ui, -apple-system, sans-serif; margin-right: 4px;" aria-hidden="true">🔁</span>
+          <span id="mode-label" class="tracking-tight">MODO CONTINUO: ACTIVADO</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Barra de Estado en Tiempo Real -->
+    <div id="playback-status-bar" class="mt-3 pt-2.5 border-t border-black/30 flex items-center justify-between text-[11px] text-gray-800">
+      <div class="flex items-center gap-2 truncate">
+        <span id="status-badge" class="inline-block w-2 h-2 rounded-full bg-gray-400"></span>
+        <span id="status-text" class="font-bold truncate">Listo para reproducir. Pulsa Play para iniciar.</span>
+      </div>
+      <div id="status-progress" class="font-bold text-gray-600 flex-shrink-0">
+        0 / {audioArticles.length}
+      </div>
+    </div>
+  </section>
+
+  <!-- Listado de Notas de Audio (Playlist) -->
+  <section class="space-y-3" id="audio-playlist" role="list">
+    {audioArticles.length === 0 ? (
+      <div class="border-2 border-dashed border-black p-8 text-center font-mono bg-white">
+        <p class="text-base font-bold uppercase mb-2">No hay notas de voz publicadas todavía</p>
+        <p class="text-xs text-gray-600 mb-4">
+          Las notas de voz de 2 minutos grabadas en los artículos aparecerán automáticamente en esta playlist.
+        </p>
+        <a href="/" class="brutal-btn brutal-btn-primary text-xs">Volver al periódico</a>
+      </div>
+    ) : (
+      audioArticles.map((article, index) => {
+        const audioSrc = article.audioUrl || article.speakPipeAudioUrl;
+        const formattedDate = new Date(article.createdAt).toLocaleDateString('es-ES', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+        });
+        const trackNumber = String(index + 1).padStart(2, '0');
+
+        return (
+          <article
+            class="audio-track-card border-2 border-black bg-white p-3 sm:p-4 shadow-[3px_3px_0px_#000] transition-all"
+            data-index={index}
+            data-title={article.title}
+            data-author={article.author}
+          >
+            <!-- Meta Superior del Track -->
+            <div class="flex items-center justify-between text-xs font-mono mb-1.5 text-gray-700">
+              <div class="flex items-center gap-2">
+                <span class="track-badge bg-black text-white font-mono font-bold px-1.5 py-0.5 text-[10px]">
+                  #{trackNumber}
+                </span>
+                <span class="font-bold text-black uppercase text-[11px]">{article.author}</span>
+                <span class="text-gray-400 hidden sm:inline">|</span>
+                <span class="text-gray-500 text-[10px] hidden sm:inline">{formattedDate}</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] font-bold text-red-700 uppercase bg-red-50 border border-red-200 px-1.5 py-0.5">
+                  Máx. 2 min.
+                </span>
+                <span class="track-state-pill font-mono text-[10px] font-bold uppercase px-1.5 py-0.5 border border-black bg-gray-100 hidden sm:inline">
+                  EN ESPERA
+                </span>
+              </div>
+            </div>
+
+            <!-- Título del Artículo: ESTRICTAMENTE 1 REM como requiere el usuario -->
+            <h2
+              class="audio-article-title font-serif font-bold text-black uppercase mb-2 leading-snug"
+              style="font-size: 1rem; line-height: 1.35;"
+            >
+              <a
+                href={`/articulo/${article.slug}`}
+                class="hover:underline hover:text-red-700 transition-colors text-black"
+                title={`Leer artículo completo: ${article.title}`}
+              >
+                {article.title}
+              </a>
+            </h2>
+
+            <!-- Reproductor de Audio HTML5 -->
+            <div class="mt-2 pt-2 border-t border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div class="flex-1">
+                <audio
+                  controls
+                  preload="metadata"
+                  class="playlist-audio w-full h-10 accent-black"
+                  data-index={index}
+                >
+                  <source src={audioSrc} />
+                  Tu navegador no soporta el reproductor de audio.
+                </audio>
+              </div>
+
+              <!-- Enlace directo al artículo -->
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <a
+                  href={`/articulo/${article.slug}`}
+                  class="brutal-btn text-[11px] font-mono font-bold py-1.5 px-2 bg-gray-50 hover:bg-black hover:text-white transition-colors"
+                >
+                  Leer texto →
+                </a>
+              </div>
+            </div>
+          </article>
+        );
+      })
+    )}
+  </section>
+
+  <!-- Banner Informativo Inferior -->
+  <div class="my-8 border-2 border-black p-4 bg-white shadow-[4px_4px_0px_#000] font-mono text-xs text-center">
+    <p class="font-bold uppercase text-red-700 mb-1">🎙️ PARTICIPACIÓN Y NOTAS DE VOZ POPULARES</p>
+    <p class="text-gray-700 m-0">
+      Las redactoras y asambleas sindicales pueden grabar notas de voz directamente desde el editor de artículos al enviar sus crónicas.
+    </p>
+  </div>
+</Layout>
+
+<style>
+  /* Resaltado de la pista activa en reproducción */
+  .audio-track-card.is-active-track {
+    border-color: #000;
+    background-color: #fef08a !important; /* bg-yellow-200 */
+    box-shadow: 5px 5px 0px #000 !important;
+    transform: translateY(-1px);
+  }
+  .audio-track-card.is-active-track .track-badge {
+    background-color: #b91c1c; /* red-700 */
+    color: #fff;
+  }
+  .audio-track-card.is-active-track .track-state-pill {
+    background-color: #000;
+    color: #fff;
+  }
+</style>
+
+<script>
+  // Playlist Controller Script
+  document.addEventListener('DOMContentLoaded', () => {
+    const audioElements = Array.from(document.querySelectorAll<HTMLAudioElement>('audio.playlist-audio'));
+    const trackCards = Array.from(document.querySelectorAll<HTMLElement>('.audio-track-card'));
+    const masterPlayBtn = document.getElementById('master-play-btn');
+    const masterPlayIcon = document.getElementById('master-play-icon');
+    const masterPlayText = document.getElementById('master-play-text');
+    const modeToggleBtn = document.getElementById('mode-toggle-btn') as HTMLButtonElement | null;
+    const modeIcon = document.getElementById('mode-icon');
+    const modeLabel = document.getElementById('mode-label');
+    const prevTrackBtn = document.getElementById('prev-track-btn') as HTMLButtonElement | null;
+    const nextTrackBtn = document.getElementById('next-track-btn') as HTMLButtonElement | null;
+    const statusBadge = document.getElementById('status-badge');
+    const statusText = document.getElementById('status-text');
+    const statusProgress = document.getElementById('status-progress');
+
+    if (audioElements.length === 0) return;
+
+    let currentIndex = -1;
+    let isPlaying = false;
+    
+    // Mode: 'continuous' (default) or 'single'
+    // Retrieve saved user preference from localStorage if available
+    let savedMode = 'continuous';
+    try {
+      const stored = localStorage.getItem('lpa_playlist_mode');
+      if (stored === 'single' || stored === 'continuous') {
+        savedMode = stored;
+      }
+    } catch (e) {
+      // Ignore storage access errors
+    }
+
+    let isContinuous = savedMode === 'continuous';
+
+    function updateModeButtonUI() {
+      if (!modeToggleBtn || !modeIcon || !modeLabel) return;
+      if (isContinuous) {
+        modeIcon.textContent = '🔁';
+        modeLabel.textContent = 'MODO CONTINUO: ACTIVADO';
+        modeToggleBtn.setAttribute('data-mode', 'continuous');
+        modeToggleBtn.setAttribute('aria-pressed', 'true');
+        modeToggleBtn.title = 'Modo continuo activo: pasará automáticamente a la siguiente nota al terminar. Pulsa para cambiar a nota única.';
+        modeToggleBtn.classList.remove('bg-gray-100');
+        modeToggleBtn.classList.add('bg-white');
+      } else {
+        modeIcon.textContent = '🔂';
+        modeLabel.textContent = 'MODO NOTA ÚNICA: ACTIVADO';
+        modeToggleBtn.setAttribute('data-mode', 'single');
+        modeToggleBtn.setAttribute('aria-pressed', 'false');
+        modeToggleBtn.title = 'Modo nota única activo: se detendrá al terminar la nota. Pulsa para activar reproducción continua.';
+        modeToggleBtn.classList.remove('bg-white');
+        modeToggleBtn.classList.add('bg-gray-100');
+      }
+    }
+
+    // Initialize toggle UI
+    updateModeButtonUI();
+
+    // Toggle button click listener: changes icon and toggles mode
+    if (modeToggleBtn) {
+      modeToggleBtn.addEventListener('click', () => {
+        isContinuous = !isContinuous;
+        try {
+          localStorage.setItem('lpa_playlist_mode', isContinuous ? 'continuous' : 'single');
+        } catch (e) {}
+        updateModeButtonUI();
+
+        if (statusText) {
+          const modeMsg = isContinuous ? 'Modo continuo activado (pasará a la siguiente nota)' : 'Modo nota única activado (se detendrá al terminar)';
+          statusText.textContent = isPlaying && currentIndex >= 0 
+            ? `Reproduciendo #${String(currentIndex + 1).padStart(2, '0')}. ${modeMsg}`
+            : modeMsg;
+        }
+      });
+    }
+
+    function updateTrackStyles(activeIndex: number, state: 'playing' | 'paused' | 'idle') {
+      trackCards.forEach((card, idx) => {
+        const pill = card.querySelector('.track-state-pill');
+        if (idx === activeIndex) {
+          card.classList.add('is-active-track');
+          if (pill) {
+            pill.textContent = state === 'playing' ? 'REPRODUCIENDO ▶' : 'EN PAUSA ⏸';
+          }
+        } else {
+          card.classList.remove('is-active-track');
+          if (pill) {
+            pill.textContent = 'EN ESPERA';
+          }
+        }
+      });
+
+      // Update Nav Buttons
+      if (prevTrackBtn) {
+        prevTrackBtn.disabled = activeIndex <= 0;
+      }
+      if (nextTrackBtn) {
+        nextTrackBtn.disabled = activeIndex < 0 || activeIndex >= audioElements.length - 1;
+      }
+    }
+
+    function updateStatus(title: string, state: 'playing' | 'paused' | 'idle' | 'ended') {
+      if (!statusBadge || !statusText || !statusProgress) return;
+
+      const trackNum = currentIndex >= 0 ? `#${String(currentIndex + 1).padStart(2, '0')}` : '';
+      statusProgress.textContent = `${currentIndex >= 0 ? currentIndex + 1 : 0} / ${audioElements.length}`;
+
+      if (state === 'playing') {
+        statusBadge.className = 'inline-block w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse';
+        statusText.innerHTML = `<strong>En reproducción ${trackNum}:</strong> ${title}`;
+        if (masterPlayIcon && masterPlayText) {
+          masterPlayIcon.textContent = '⏸';
+          masterPlayText.textContent = 'PAUSAR';
+        }
+      } else if (state === 'paused') {
+        statusBadge.className = 'inline-block w-2.5 h-2.5 rounded-full bg-yellow-500';
+        statusText.innerHTML = `<strong>En pausa ${trackNum}:</strong> ${title}`;
+        if (masterPlayIcon && masterPlayText) {
+          masterPlayIcon.textContent = '▶';
+          masterPlayText.textContent = 'REANUDAR';
+        }
+      } else if (state === 'ended') {
+        statusBadge.className = 'inline-block w-2.5 h-2.5 rounded-full bg-gray-400';
+        statusText.textContent = 'Fin de la playlist alcanzado. Pulsa Play para reiniciar.';
+        if (masterPlayIcon && masterPlayText) {
+          masterPlayIcon.textContent = '▶';
+          masterPlayText.textContent = 'REPRODUCIR PLAYLIST';
+        }
+      } else {
+        statusBadge.className = 'inline-block w-2.5 h-2.5 rounded-full bg-gray-400';
+        statusText.textContent = 'Listo para reproducir. Pulsa Play para iniciar.';
+        if (masterPlayIcon && masterPlayText) {
+          masterPlayIcon.textContent = '▶';
+          masterPlayText.textContent = 'REPRODUCIR PLAYLIST';
+        }
+      }
+    }
+
+    function playTrack(index: number) {
+      if (index < 0 || index >= audioElements.length) return;
+
+      // Pause all other audio tracks
+      audioElements.forEach((audio, idx) => {
+        if (idx !== index && !audio.paused) {
+          audio.pause();
+        }
+      });
+
+      currentIndex = index;
+      const targetAudio = audioElements[index];
+      const targetCard = trackCards[index];
+      const title = targetCard?.getAttribute('data-title') || 'Nota de voz';
+
+      updateTrackStyles(currentIndex, 'playing');
+      updateStatus(title, 'playing');
+
+      // Scroll smoothly into view if out of viewport
+      targetCard?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+      targetAudio.play().catch(err => {
+        console.warn('Auto play prevented by browser:', err);
+      });
+    }
+
+    function pauseCurrentTrack() {
+      if (currentIndex >= 0 && currentIndex < audioElements.length) {
+        audioElements[currentIndex].pause();
+      }
+    }
+
+    // Audio elements event listeners
+    audioElements.forEach((audio, idx) => {
+      audio.addEventListener('play', () => {
+        // If a different audio started playing, pause others and track this one
+        if (currentIndex !== idx) {
+          audioElements.forEach((otherAudio, otherIdx) => {
+            if (otherIdx !== idx && !otherAudio.paused) {
+              otherAudio.pause();
+            }
+          });
+          currentIndex = idx;
+        }
+        isPlaying = true;
+        const title = trackCards[idx]?.getAttribute('data-title') || 'Nota de voz';
+        updateTrackStyles(idx, 'playing');
+        updateStatus(title, 'playing');
+      });
+
+      audio.addEventListener('pause', () => {
+        if (currentIndex === idx) {
+          isPlaying = false;
+          const title = trackCards[idx]?.getAttribute('data-title') || 'Nota de voz';
+          updateTrackStyles(idx, 'paused');
+          updateStatus(title, 'paused');
+        }
+      });
+
+      audio.addEventListener('ended', () => {
+        const title = trackCards[idx]?.getAttribute('data-title') || 'Nota de voz';
+
+        // Check if continuous mode is ON
+        if (isContinuous) {
+          const nextIndex = idx + 1;
+          if (nextIndex < audioElements.length) {
+            // Advance to next audio in playlist
+            playTrack(nextIndex);
+          } else {
+            // Reached end of playlist
+            isPlaying = false;
+            updateTrackStyles(-1, 'idle');
+            updateStatus(title, 'ended');
+          }
+        } else {
+          // Single note mode: stop playback here
+          isPlaying = false;
+          updateTrackStyles(idx, 'paused');
+          if (statusBadge && statusText) {
+            statusBadge.className = 'inline-block w-2.5 h-2.5 rounded-full bg-gray-400';
+            statusText.innerHTML = `<strong>Finalizada ${trackCards[idx]?.getAttribute('data-title') || ''}</strong> (Modo nota única)`;
+          }
+          if (masterPlayIcon && masterPlayText) {
+            masterPlayIcon.textContent = '▶';
+            masterPlayText.textContent = 'REPRODUCIR PLAYLIST';
+          }
+        }
+      });
+    });
+
+    // Master Play Button
+    if (masterPlayBtn) {
+      masterPlayBtn.addEventListener('click', () => {
+        if (isPlaying) {
+          pauseCurrentTrack();
+        } else {
+          if (currentIndex === -1) {
+            playTrack(0);
+          } else {
+            // Resume current or start next if at end
+            const currentAudio = audioElements[currentIndex];
+            if (currentAudio.ended) {
+              playTrack(currentIndex + 1 < audioElements.length ? currentIndex + 1 : 0);
+            } else {
+              currentAudio.play().catch(console.warn);
+            }
+          }
+        }
+      });
+    }
+
+    // Previous Track Button
+    if (prevTrackBtn) {
+      prevTrackBtn.addEventListener('click', () => {
+        if (currentIndex > 0) {
+          playTrack(currentIndex - 1);
+        }
+      });
+    }
+
+    // Next Track Button
+    if (nextTrackBtn) {
+      nextTrackBtn.addEventListener('click', () => {
+        if (currentIndex < audioElements.length - 1) {
+          playTrack(currentIndex + 1);
+        }
+      });
+    }
+  });
+</script>

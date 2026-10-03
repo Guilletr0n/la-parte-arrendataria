@@ -46,8 +46,11 @@ const canonicalUrl = `${siteUrl}${canonicalPath.startsWith('/') ? canonicalPath 
   </head>
   <body class="min-h-screen flex flex-col items-center p-3 sm:p-6 text-black selection:bg-yellow-300 selection:text-black">
     <!-- Top Bar Navigation / Admin access -->
-    <nav class={`w-full ${maxWidth} flex justify-between items-center mb-4 no-print text-xs font-mono border-b border-gray-400 pb-2`}>
-      <a href="/" class="font-bold hover:underline">← EDICIÓN DIGITAL ACTUAL</a>
+    <nav class={`w-full ${maxWidth} flex flex-wrap justify-between items-center gap-2 mb-4 no-print text-xs font-mono border-b border-gray-400 pb-2`}>
+      <div class="flex gap-4 items-center">
+        <a href="/" class="font-bold hover:underline">← EDICIÓN DIGITAL ACTUAL</a>
+        <a href="/audios" class="font-bold hover:underline text-black flex items-center gap-1">🎙️ NOTAS DE VOZ</a>
+      </div>
       <div class="flex gap-4 items-center">
         <a href="/admin/export-fanzine" class="hover:underline font-bold text-red-700">⚡ IMPRIMIR FANZINE</a>
         <a href="/admin" class="hover:underline font-bold">PANEL CMS [ADMIN]</a>

@@ -5,8 +5,8 @@ import { getCurrentUser, canPublish } from '../../lib/auth';
 export const prerender = false;
 
 const user = await getCurrentUser(Astro.cookies);
-if (!user) {
-  return Astro.redirect('/admin/login');
+if (!user || user.role === 'reader') {
+  return Astro.redirect('/admin');
 }
 
 const isAdmin = canPublish(user);

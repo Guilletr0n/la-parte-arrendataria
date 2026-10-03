@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite';
 
 // https://astro.build/config
 export default defineConfig({
+  site: process.env.SITE_URL || 'https://www.arrendataria.org',
   output: 'server',
   adapter: node({
     mode: 'standalone',

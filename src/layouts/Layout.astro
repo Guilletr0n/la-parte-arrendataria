@@ -1,17 +1,25 @@
 ---
 import '../styles/global.css';
+import VoteModal from '../components/VoteModal.astro';
+import { getSiteUrl, getDomain } from '../lib/config';
 
 interface Props {
   title?: string;
   description?: string;
   maxWidth?: string;
+  canonicalPath?: string;
 }
 
 const {
   title = 'La Parte Arrendataria | Fanzine de Guerrilla',
   description = 'Órgano de contrainformación editorial, derecho a la vivienda y cultura inquilina.',
   maxWidth = 'max-w-[720px]',
+  canonicalPath = Astro.url.pathname,
 } = Astro.props;
+
+const siteUrl = getSiteUrl();
+const domain = getDomain();
+const canonicalUrl = `${siteUrl}${canonicalPath.startsWith('/') ? canonicalPath : '/' + canonicalPath}`;
 ---
 
 <!doctype html>
@@ -22,6 +30,11 @@ const {
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="generator" content={Astro.generator} />
     <meta name="description" content={description} />
+    <link rel="canonical" href={canonicalUrl} />
+    <meta property="og:site_name" content="La Parte Arrendataria" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonicalUrl} />
     <title>{title}</title>
     <!-- Google Fonts for Editorial / Brutalist aesthetic -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -50,8 +63,11 @@ const {
     <footer class={`w-full ${maxWidth} mt-12 mb-6 pt-4 border-t-2 border-black text-center font-mono text-xs text-gray-700 no-print`}>
       <p class="font-bold mb-1">LA PARTE ARRENDATARIA — EDICIÓN POPULAR FANZINE</p>
       <p class="text-[11px] text-gray-500">
-        Copyleft 2026. Distribución física y digital libre. Fotocopia este panfleto y pásalo.
+        Copyleft 2026. Distribución física y digital libre en <a href={siteUrl} class="underline hover:text-black font-semibold">{domain}</a>. Fotocopia este panfleto y pásalo.
       </p>
     </footer>
+
+    <!-- Modal emergente para límite de 3 votos anónimos -->
+    <VoteModal />
   </body>
 </html>

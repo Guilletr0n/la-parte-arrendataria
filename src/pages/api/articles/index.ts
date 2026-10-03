@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { getCurrentUser, canPublish } from '../../../lib/auth';
+import { getCurrentUser, canPublish, canCreateArticle } from '../../../lib/auth';
 import { createArticle, getArticles } from '../../../lib/db';
 import type { ArticleStatus } from '../../../lib/types';
 
@@ -18,6 +18,13 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   if (!user) {
     return new Response(JSON.stringify({ error: 'No autorizado. Debes iniciar sesión.' }), {
       status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  if (!canCreateArticle(user)) {
+    return new Response(JSON.stringify({ error: 'Permisos insuficientes: una cuenta lectora no tiene permisos de redacción.' }), {
+      status: 403,
       headers: { 'Content-Type': 'application/json' },
     });
   }

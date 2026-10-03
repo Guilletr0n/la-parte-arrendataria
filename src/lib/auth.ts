@@ -1,53 +1,41 @@
 import type { AstroCookies } from 'astro';
 import type { User, UserRole } from './types';
-import admin from 'firebase-admin';
+import { getUserByEmail } from './users';
 
 const AUTH_COOKIE_NAME = 'lpa_session_user';
 
-// Mock credentials for zero-config local operation & staging tests
-const SYSTEM_USERS: User[] = [
-  {
-    uid: 'user-admin-01',
-    email: 'admin@lapartearrendataria.org',
-    displayName: 'Comité Editorial (Admin)',
-    role: 'admin',
-  },
-  {
-    uid: 'user-editor-01',
-    email: 'editor@lapartearrendataria.org',
-    displayName: 'Redacción Guerrilla (Editor)',
-    role: 'editor',
-  },
-];
-
 export async function authenticateWithPassword(email: string, pass: string): Promise<User | null> {
   const cleanEmail = email.trim().toLowerCase();
-  
-  // 1. Check local mock users for rapid development & fallback
-  if (cleanEmail === 'admin@lapartearrendataria.org' && pass === 'admin123') {
-    return SYSTEM_USERS[0];
-  }
-  if (cleanEmail === 'editor@lapartearrendataria.org' && pass === 'editor123') {
-    return SYSTEM_USERS[1];
+
+  // 1. Look up user in persistent store (Firestore / local JSON)
+  const dbUser = await getUserByEmail(cleanEmail);
+  if (dbUser) {
+    if (dbUser.password && dbUser.password === pass) {
+      return {
+        uid: dbUser.uid,
+        email: dbUser.email,
+        displayName: dbUser.displayName,
+        role: dbUser.role,
+      };
+    }
   }
 
-  // 2. Check Firebase Auth if configured
-  try {
-    if (admin.apps.length) {
-      const fbUser = await admin.auth().getUserByEmail(cleanEmail);
-      if (fbUser) {
-        const customClaims = fbUser.customClaims || {};
-        const role: UserRole = customClaims.role === 'admin' ? 'admin' : 'editor';
-        return {
-          uid: fbUser.uid,
-          email: fbUser.email || cleanEmail,
-          displayName: fbUser.displayName || cleanEmail.split('@')[0],
-          role,
-        };
-      }
-    }
-  } catch (err) {
-    console.warn('Firebase Auth verify notice:', err);
+  // 2. Fallback to initial credentials for rapid development
+  if (cleanEmail === 'admin@lapartearrendataria.org' && pass === 'admin123') {
+    return {
+      uid: 'user-admin-01',
+      email: 'admin@lapartearrendataria.org',
+      displayName: 'Comité Editorial (Admin)',
+      role: 'admin',
+    };
+  }
+  if (cleanEmail === 'editor@lapartearrendataria.org' && pass === 'editor123') {
+    return {
+      uid: 'user-editor-01',
+      email: 'editor@lapartearrendataria.org',
+      displayName: 'Redacción Guerrilla (Editor)',
+      role: 'editor',
+    };
   }
 
   return null;
@@ -94,12 +82,21 @@ export function canExportPdf(user: User | null): boolean {
   return user?.role === 'admin';
 }
 
+export function canManageUsers(user: User | null): boolean {
+  return user?.role === 'admin';
+}
+
+export function canCreateArticle(user: User | null): boolean {
+  return user?.role === 'admin' || user?.role === 'editor';
+}
+
 export function canEditArticle(user: User | null, articleAuthorUid?: string): boolean {
   if (!user) return false;
   if (user.role === 'admin') return true;
   if (user.role === 'editor') {
-    // Editor can edit draft articles
-    return true;
+    // Un usuario editor puede editar los que él ha subido, no los de los demás
+    return !!articleAuthorUid && articleAuthorUid === user.uid;
   }
   return false;
 }
+

@@ -31,6 +31,8 @@ steps:
       - '2Gi'
       - '--cpu'
       - '1'
+      - '--set-env-vars'
+      - 'SITE_URL=https://www.arrendataria.org,DOMAIN=www.arrendataria.org,GCP_PROJECT_ID=$PROJECT_ID,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GCS_BUCKET_NAME=la-parte-arrendataria-media,NODE_ENV=production'
 
 images:
   - 'gcr.io/$PROJECT_ID/la-parte-arrendataria:latest'

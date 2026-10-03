@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { getCurrentUser, canPublish, canDelete } from '../../../lib/auth';
+import { getCurrentUser, canPublish, canDelete, canEditArticle } from '../../../lib/auth';
 import { getArticleById, updateArticle, deleteArticle } from '../../../lib/db';
 
 export const prerender = false;
@@ -27,6 +27,14 @@ export const PUT: APIRoute = async ({ params, request, cookies }) => {
       status: 404,
       headers: { 'Content-Type': 'application/json' },
     });
+  }
+
+  // Check author ownership for editors
+  if (!canEditArticle(user, existing.authorUid)) {
+    return new Response(
+      JSON.stringify({ error: 'Permisos insuficientes: un editor sólo puede modificar los artículos que él ha redactado.' }),
+      { status: 403, headers: { 'Content-Type': 'application/json' } }
+    );
   }
 
   try {

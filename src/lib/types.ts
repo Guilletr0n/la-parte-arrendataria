@@ -1,10 +1,13 @@
-export type UserRole = 'admin' | 'editor';
+export type UserRole = 'admin' | 'editor' | 'reader';
 
 export interface User {
   uid: string;
   email: string;
   displayName: string;
   role: UserRole;
+  password?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type ArticleStatus = 'draft' | 'published';
@@ -31,6 +34,7 @@ export interface Article {
   printOrder?: number;
   fanzineCategory?: FanzineCategory;
   includeInInterior?: boolean;
+  votes?: number;
 }
 
 export interface FanzineIssue {

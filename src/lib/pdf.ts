@@ -22,8 +22,8 @@ export async function generateFanzinePdf(targetUrl: string): Promise<Buffer> {
     browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
 
-    // Set viewport for high quality editorial printing
-    await page.setViewport({ width: 1200, height: 1600, deviceScaleFactor: 2 });
+    // Set viewport for high quality editorial printing in A4 landscape (297mm x 210mm)
+    await page.setViewport({ width: 1680, height: 1190, deviceScaleFactor: 2 });
 
     // Navigate to the print preview page
     await page.goto(targetUrl, {
@@ -36,22 +36,15 @@ export async function generateFanzinePdf(targetUrl: string): Promise<Buffer> {
 
     const pdfUint8Array = await page.pdf({
       format: 'A4',
-      landscape: false,
+      landscape: true,
       printBackground: true,
       margin: {
-        top: '10mm',
-        bottom: '15mm',
-        left: '10mm',
-        right: '10mm',
+        top: '0mm',
+        bottom: '0mm',
+        left: '0mm',
+        right: '0mm',
       },
-      displayHeaderFooter: true,
-      headerTemplate: '<div></div>',
-      footerTemplate: `
-        <div style="font-family: 'Courier New', Courier, monospace; font-size: 8pt; width: 100%; display: flex; justify-content: space-between; border-top: 1px solid #000; padding: 4px 10mm 0 10mm; color: #222;">
-          <span>LA PARTE ARRENDATARIA — EDICIÓN IMPRESA POPULAR</span>
-          <span>PÁGINA <span class="pageNumber"></span> DE <span class="totalPages"></span></span>
-        </div>
-      `,
+      displayHeaderFooter: false,
     });
 
     return Buffer.from(pdfUint8Array);

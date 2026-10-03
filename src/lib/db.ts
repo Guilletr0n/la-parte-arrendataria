@@ -1,31 +1,39 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Article, ArticleStatus, FanzineIssue, User, UserRole } from './types';
-import admin from 'firebase-admin';
+import type { Article, ArticleStatus, FanzineCategory, FanzineIssue, User, UserRole } from './types';
+import { Firestore, FieldValue, type Query } from '@google-cloud/firestore';
 
-// Initialize Firebase Admin if credentials are provided or in GCP environment
-let firestoreDb: admin.firestore.Firestore | null = null;
+// Initialize Google Cloud Firestore if credentials are provided or in GCP environment
+let firestoreDb: Firestore | null = null;
 
 try {
+  const projectId = process.env.GCP_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || 'la-parte-arrendataria';
+  const defaultKeyPath = path.resolve(process.cwd(), 'service-account.json');
+  const envKeyPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  const keyPath = (envKeyPath && fs.existsSync(envKeyPath)) ? envKeyPath : (fs.existsSync(defaultKeyPath) ? defaultKeyPath : undefined);
+
   if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
-    if (!admin.apps.length) {
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-      });
-    }
-    firestoreDb = admin.firestore();
-  } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS || process.env.K_SERVICE) {
+    const credentials = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+    firestoreDb = new Firestore({
+      projectId,
+      credentials,
+      databaseId: '(default)',
+    });
+  } else if (keyPath) {
+    firestoreDb = new Firestore({
+      projectId,
+      keyFilename: keyPath,
+      databaseId: '(default)',
+    });
+  } else if (process.env.K_SERVICE || process.env.GOOGLE_APPLICATION_CREDENTIALS) {
     // Standard GCP environment (Cloud Run uses Application Default Credentials)
-    if (!admin.apps.length) {
-      admin.initializeApp({
-        projectId: process.env.GCP_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT,
-      });
-    }
-    firestoreDb = admin.firestore();
+    firestoreDb = new Firestore({
+      projectId,
+      databaseId: '(default)',
+    });
   }
 } catch (e) {
-  console.warn('Firebase Admin init notice: Falling back to local data store.', e);
+  console.warn('Google Cloud Firestore init notice: Falling back to local data store.', e);
 }
 
 // Local persistent JSON storage fallback
@@ -238,11 +246,55 @@ function writeLocalArticles(articles: Article[]) {
   fs.writeFileSync(ARTICLES_FILE, JSON.stringify(articles, null, 2), 'utf-8');
 }
 
+// Blended ranking score (mix of votes received and publication date)
+// Each vote grants a 36-hour boost on the timeline, rewarding popular articles while keeping fresh stories competitive.
+const VOTE_BOOST_MS = 36 * 60 * 60 * 1000;
+
+export function calculateArticleScore(article: Article): number {
+  const votes = article.votes || 0;
+  const createdMs = new Date(article.createdAt).getTime();
+  return createdMs + (votes * VOTE_BOOST_MS);
+}
+
+export function sortArticlesBlended(a: Article, b: Article): number {
+  const scoreDiff = calculateArticleScore(b) - calculateArticleScore(a);
+  if (Math.abs(scoreDiff) > 0.0001) {
+    return scoreDiff;
+  }
+  // Tie-breaker 1: most votes
+  const voteDiff = (b.votes || 0) - (a.votes || 0);
+  if (voteDiff !== 0) return voteDiff;
+  // Tie-breaker 2: newest first
+  return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+}
+
+export interface GetArticlesOptions {
+  status?: ArticleStatus;
+  selectedForPrint?: boolean;
+  sortBy?: 'blended' | 'date' | 'votes' | 'printOrder';
+}
+
+function applyArticleSorting(articles: Article[], sortBy?: 'blended' | 'date' | 'votes' | 'printOrder', isPrintSelection?: boolean): Article[] {
+  if (isPrintSelection || sortBy === 'printOrder') {
+    return articles.sort((a, b) => (a.printOrder ?? 999) - (b.printOrder ?? 999));
+  }
+  if (sortBy === 'date') {
+    return articles.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+  if (sortBy === 'votes') {
+    return articles.sort((a, b) => ((b.votes || 0) - (a.votes || 0)) || (new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+  }
+  // Default: blended ranking (votes + date)
+  return articles.sort(sortArticlesBlended);
+}
+
 // Public Data Methods
-export async function getArticles(filter?: { status?: ArticleStatus; selectedForPrint?: boolean }): Promise<Article[]> {
+export async function getArticles(filter?: GetArticlesOptions): Promise<Article[]> {
+  const sortBy = filter?.sortBy || (filter?.selectedForPrint ? 'printOrder' : 'blended');
+
   if (firestoreDb) {
     try {
-      let query: admin.firestore.Query = firestoreDb.collection('articles');
+      let query: Query = firestoreDb.collection('articles');
       if (filter?.status) {
         query = query.where('status', '==', filter.status);
       }
@@ -251,7 +303,7 @@ export async function getArticles(filter?: { status?: ArticleStatus; selectedFor
       }
       const snapshot = await query.get();
       const articles = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Article));
-      return articles.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      return applyArticleSorting(articles, sortBy, filter?.selectedForPrint);
     } catch (e) {
       console.warn('Firestore query error, falling back to local file store', e);
     }
@@ -264,7 +316,7 @@ export async function getArticles(filter?: { status?: ArticleStatus; selectedFor
   if (filter?.selectedForPrint !== undefined) {
     list = list.filter(a => !!a.selectedForPrint === filter.selectedForPrint);
   }
-  return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return applyArticleSorting(list, sortBy, filter?.selectedForPrint);
 }
 
 export async function getArticleById(id: string): Promise<Article | null> {
@@ -284,8 +336,63 @@ export async function getArticleById(id: string): Promise<Article | null> {
 }
 
 export async function getArticleBySlug(slug: string): Promise<Article | null> {
-  const articles = await getArticles();
-  return articles.find(a => a.slug === slug) || null;
+  if (firestoreDb) {
+    try {
+      const snap = await firestoreDb.collection('articles').where('slug', '==', slug).limit(1).get();
+      if (!snap.empty) {
+        const doc = snap.docs[0];
+        return { id: doc.id, ...doc.data() } as Article;
+      }
+    } catch (e) {
+      console.warn('Firestore getArticleBySlug error, using fallback', e);
+    }
+  }
+  const list = readLocalArticles();
+  return list.find(a => a.slug === slug) || null;
+}
+
+export async function incrementArticleVote(id: string): Promise<number> {
+  let newVoteCount = 1;
+  const now = new Date().toISOString();
+
+  if (firestoreDb) {
+    try {
+      const docRef = firestoreDb.collection('articles').doc(id);
+      await docRef.update({
+        votes: FieldValue.increment(1),
+        updatedAt: now,
+      });
+      const snap = await docRef.get();
+      if (snap.exists) {
+        newVoteCount = (snap.data()?.votes as number) || 1;
+      }
+    } catch (e) {
+      console.warn('Firestore increment vote error, updating local store:', e);
+      newVoteCount = incrementLocalVote(id);
+    }
+  } else {
+    newVoteCount = incrementLocalVote(id);
+  }
+
+  // Also sync to local JSON store for persistence/offline consistency
+  incrementLocalVote(id, newVoteCount);
+
+  return newVoteCount;
+}
+
+function incrementLocalVote(id: string, exactCount?: number): number {
+  const list = readLocalArticles();
+  const index = list.findIndex(a => a.id === id);
+  if (index === -1) return 1;
+
+  if (exactCount !== undefined) {
+    list[index].votes = exactCount;
+  } else {
+    list[index].votes = (list[index].votes || 0) + 1;
+  }
+  list[index].updatedAt = new Date().toISOString();
+  writeLocalArticles(list);
+  return list[index].votes || 1;
 }
 
 export async function createArticle(data: Omit<Article, 'id' | 'createdAt' | 'updatedAt'>): Promise<Article> {
@@ -294,6 +401,7 @@ export async function createArticle(data: Omit<Article, 'id' | 'createdAt' | 'up
   const newArticle: Article = {
     ...data,
     id,
+    votes: data.votes ?? 0,
     createdAt: now,
     updatedAt: now,
   };
@@ -422,3 +530,82 @@ export async function updatePrintSelection(
 
   return updated.filter(a => a.selectedForPrint).sort((a, b) => (a.printOrder || 0) - (b.printOrder || 0));
 }
+
+export async function reassignAuthorArticles(
+  oldAuthorUid: string,
+  newAuthor: { uid: string; name: string; role: UserRole }
+): Promise<number> {
+  const now = new Date().toISOString();
+  let count = 0;
+
+  if (firestoreDb) {
+    try {
+      const snap = await firestoreDb.collection('articles').where('authorUid', '==', oldAuthorUid).get();
+      const batch = firestoreDb.batch();
+      snap.docs.forEach((doc) => {
+        batch.update(doc.ref, {
+          authorUid: newAuthor.uid,
+          author: newAuthor.name,
+          authorRole: newAuthor.role,
+          updatedAt: now,
+        });
+        count++;
+      });
+      if (snap.size > 0) {
+        await batch.commit();
+      }
+    } catch (e) {
+      console.warn('Firestore reassignAuthorArticles error', e);
+    }
+  }
+
+  const list = readLocalArticles();
+  let localCount = 0;
+  const updatedList = list.map((art) => {
+    if (art.authorUid === oldAuthorUid) {
+      localCount++;
+      return {
+        ...art,
+        authorUid: newAuthor.uid,
+        author: newAuthor.name,
+        authorRole: newAuthor.role,
+        updatedAt: now,
+      };
+    }
+    return art;
+  });
+
+  if (localCount > 0) {
+    writeLocalArticles(updatedList);
+  }
+
+  return Math.max(count, localCount);
+}
+
+export async function updateAuthorDisplayName(authorUid: string, newDisplayName: string): Promise<void> {
+  const now = new Date().toISOString();
+  if (firestoreDb) {
+    try {
+      const snap = await firestoreDb.collection('articles').where('authorUid', '==', authorUid).get();
+      const batch = firestoreDb.batch();
+      snap.docs.forEach((doc) => {
+        batch.update(doc.ref, { author: newDisplayName, updatedAt: now });
+      });
+      if (snap.size > 0) {
+        await batch.commit();
+      }
+    } catch (e) {
+      console.warn('Firestore updateAuthorDisplayName error', e);
+    }
+  }
+
+  const list = readLocalArticles();
+  const updated = list.map((art) => {
+    if (art.authorUid === authorUid) {
+      return { ...art, author: newDisplayName, updatedAt: now };
+    }
+    return art;
+  });
+  writeLocalArticles(updated);
+}
+

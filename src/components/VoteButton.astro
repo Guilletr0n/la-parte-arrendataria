@@ -1,0 +1,175 @@
+---
+interface Props {
+  articleId: string;
+  initialVotes?: number;
+  class?: string;
+}
+
+const { articleId, initialVotes = 0, class: className = '' } = Astro.props;
+---
+
+<div class={`inline-block ${className}`}>
+  <button
+    type="button"
+    class="lpa-vote-btn brutal-btn inline-flex items-center gap-2 text-xs font-mono font-bold transition-all disabled:cursor-not-allowed select-none"
+    data-article-id={articleId}
+    data-votes={initialVotes}
+    aria-label="Apoyar este artículo con puño en alto"
+  >
+    <span class="text-sm leading-none transition-transform duration-150 active:scale-125">✊🏼</span>
+    <span class="lpa-vote-label uppercase">Apoyar</span>
+    <span class="lpa-vote-count px-1.5 py-0.5 text-[11px] font-bold tracking-wider font-mono">
+      {initialVotes}
+    </span>
+  </button>
+</div>
+
+<script>
+  const VOTES_STORAGE_KEY = 'lpa_syndication_votes';
+
+  function getStoredVotes(): string[] {
+    try {
+      const raw = localStorage.getItem(VOTES_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveStoredVotes(ids: string[]) {
+    try {
+      localStorage.setItem(VOTES_STORAGE_KEY, JSON.stringify(ids));
+    } catch (e) {
+      console.warn('LocalStorage error saving votes', e);
+    }
+  }
+
+  function isUserRegistered(): boolean {
+    return document.cookie.split(';').some((c) => c.trim().startsWith('lpa_session_user='));
+  }
+
+  function applyVotedStyle(btn: HTMLButtonElement, isVoted: boolean) {
+    const label = btn.querySelector('.lpa-vote-label');
+    const count = btn.querySelector('.lpa-vote-count');
+
+    if (isVoted) {
+      btn.disabled = true;
+      btn.title = 'Ya has apoyado este artículo para el fanzine';
+      btn.classList.add('bg-black', 'text-white', 'hover:bg-black', 'border-black');
+      btn.classList.remove('bg-white', 'text-black', 'hover:bg-yellow-300');
+      if (label) label.textContent = 'Apoyado';
+      if (count) {
+        count.className = 'lpa-vote-count px-1.5 py-0.5 text-[11px] font-bold tracking-wider font-mono bg-yellow-300 text-black border border-black';
+      }
+    } else {
+      btn.disabled = false;
+      btn.title = 'Apoya este artículo con puño en alto ✊🏼';
+      btn.classList.remove('bg-black', 'text-white', 'hover:bg-black');
+      btn.classList.add('bg-white', 'text-black', 'hover:bg-yellow-300', 'border-black');
+      if (label) label.textContent = 'Apoyar';
+      if (count) {
+        count.className = 'lpa-vote-count px-1.5 py-0.5 text-[11px] font-bold tracking-wider font-mono bg-black text-white';
+      }
+    }
+  }
+
+  function initVoteButtons() {
+    const votedList = getStoredVotes();
+    const buttons = document.querySelectorAll<HTMLButtonElement>('.lpa-vote-btn');
+
+    buttons.forEach((btn) => {
+      const articleId = btn.getAttribute('data-article-id');
+      if (!articleId) return;
+
+      const hasVoted = votedList.includes(articleId);
+      applyVotedStyle(btn, hasVoted);
+
+      if (btn.dataset.voteListenerAttached) return;
+      btn.dataset.voteListenerAttached = 'true';
+
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const currentVotes = getStoredVotes();
+        if (currentVotes.includes(articleId)) {
+          return;
+        }
+
+        // Limit rule: Anonymous/unregistered users are capped at 3 total votes
+        const isRegistered = isUserRegistered();
+        if (!isRegistered && currentVotes.length >= 3) {
+          const modal = document.getElementById('vote-limit-modal') as HTMLDialogElement | null;
+          if (modal && typeof modal.showModal === 'function') {
+            modal.showModal();
+          } else {
+            alert('Has alcanzado el límite de 3 apoyos como visitante anónima. Inicia sesión para apoyar más propuestas (1 voto por artículo).');
+          }
+          return;
+        }
+
+        // Optimistic UI update
+        const countSpan = btn.querySelector('.lpa-vote-count');
+        const prevVotes = parseInt(btn.getAttribute('data-votes') || '0', 10);
+        const optimisticCount = prevVotes + 1;
+
+        btn.setAttribute('data-votes', String(optimisticCount));
+        if (countSpan) countSpan.textContent = String(optimisticCount);
+        applyVotedStyle(btn, true);
+
+        try {
+          const res = await fetch('/api/articles/vote', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ articleId }),
+          });
+
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+          }
+
+          const data = await res.json();
+          const finalCount = data.votes ?? optimisticCount;
+
+          btn.setAttribute('data-votes', String(finalCount));
+          if (countSpan) countSpan.textContent = String(finalCount);
+
+          // Save ID in LocalStorage
+          const updatedList = Array.from(new Set([...getStoredVotes(), articleId]));
+          saveStoredVotes(updatedList);
+
+          // Broadcast to other buttons on the page
+          window.dispatchEvent(
+            new CustomEvent('lpa-sync-vote', {
+              detail: { articleId, votes: finalCount },
+            })
+          );
+        } catch (err) {
+          console.error('Error al emitir voto popular:', err);
+          // Rollback on network/server error
+          btn.setAttribute('data-votes', String(prevVotes));
+          if (countSpan) countSpan.textContent = String(prevVotes);
+          applyVotedStyle(btn, false);
+          alert('Hubo un error al registrar tu apoyo popular. Inténtalo de nuevo en unos momentos.');
+        }
+      });
+    });
+  }
+
+  // Cross-component sync listener
+  window.addEventListener('lpa-sync-vote', ((e: CustomEvent) => {
+    const { articleId, votes } = e.detail || {};
+    if (!articleId) return;
+
+    document.querySelectorAll<HTMLButtonElement>(`.lpa-vote-btn[data-article-id="${articleId}"]`).forEach((btn) => {
+      btn.setAttribute('data-votes', String(votes));
+      const countSpan = btn.querySelector('.lpa-vote-count');
+      if (countSpan) countSpan.textContent = String(votes);
+      applyVotedStyle(btn, true);
+    });
+  }) as EventListener);
+
+  // Run on initial load and view transitions
+  initVoteButtons();
+  document.addEventListener('astro:page-load', initVoteButtons);
+</script>

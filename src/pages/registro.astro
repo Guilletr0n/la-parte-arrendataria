@@ -1,0 +1,158 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getCurrentUser } from '../lib/auth';
+
+export const prerender = false;
+
+const user = await getCurrentUser(Astro.cookies);
+if (user) {
+  return Astro.redirect('/');
+}
+---
+
+<Layout title="Postulación a la Redacción | La Parte Arrendataria">
+  <div class="max-w-[480px] mx-auto my-8 font-mono">
+    <div class="border-[3px] border-black bg-white p-6 shadow-[6px_6px_0px_#000]">
+      <div class="border-b-2 border-black pb-3 mb-6 text-center">
+        <div class="flex items-center justify-center gap-2 mb-1">
+          <span class="text-2xl select-none">✊🏼</span>
+          <span class="text-xs font-bold uppercase tracking-widest text-red-600 block">
+            SINDICATO DE INQUILINAS • REDACCIÓN
+          </span>
+        </div>
+        <h1 class="text-2xl font-black font-serif uppercase tracking-tight text-black m-0">
+          Solicitud de Editora
+        </h1>
+        <p class="text-xs text-gray-600 mt-2 leading-relaxed">
+          Postúlate para unirte al equipo de redacción y subir artículos al fanzine.
+        </p>
+      </div>
+
+      <div class="bg-yellow-50 border-2 border-black p-3 mb-5 text-[11px] text-gray-800 leading-normal space-y-1.5 shadow-[2px_2px_0px_#000]">
+        <div class="font-bold uppercase text-red-700 flex items-center gap-1">
+          <span>ℹ️</span>
+          <span>Proceso de Incorporación:</span>
+        </div>
+        <p>
+          Al registrarte se crea tu postulación en estado <strong>pendiente de aprobación</strong>. Una administradora del Comité Editorial validará tu cuenta y te asignará el rol de <strong>Editora</strong> para que puedas redactar y subir artículos.
+        </p>
+        <p class="text-gray-600 border-t border-gray-300 pt-1.5 font-medium">
+          <strong>Principio democrático:</strong> Mientras se aprueba tu rol, tu cuenta te permite participar apoyando todas las propuestas de la asamblea (1 voto por artículo, sin el tope anónimo de 3).
+        </p>
+      </div>
+
+      <div id="error-box" class="hidden mb-4 p-3 bg-red-100 border-2 border-red-700 text-red-800 text-xs font-bold"></div>
+      <div id="success-box" class="hidden mb-4 p-3 bg-green-100 border-2 border-green-700 text-green-900 text-xs font-bold"></div>
+
+      <form id="register-form" class="space-y-4 text-xs">
+        <div>
+          <label class="block font-bold uppercase mb-1" for="displayName">
+            Nombre / Firma pública con la que publicarás:
+          </label>
+          <input
+            type="text"
+            id="displayName"
+            name="displayName"
+            required
+            placeholder="Ej: Inquilina Tetuán, Maricarmen G."
+            class="w-full border-2 border-black p-2 bg-[#fdfdfd] focus:outline-none focus:ring-2 focus:ring-black"
+          />
+          <span class="text-[10px] text-gray-500 block mt-0.5">
+            Esta firma aparecerá al pie de los artículos que redactes una vez asignado el rol.
+          </span>
+        </div>
+
+        <div>
+          <label class="block font-bold uppercase mb-1" for="email">
+            Correo Electrónico:
+          </label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            required
+            placeholder="tu-correo@asamblea.org"
+            class="w-full border-2 border-black p-2 bg-[#fdfdfd] focus:outline-none focus:ring-2 focus:ring-black"
+          />
+        </div>
+
+        <div>
+          <label class="block font-bold uppercase mb-1" for="password">
+            Contraseña (mínimo 6 caracteres):
+          </label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            required
+            minlength="6"
+            placeholder="••••••••"
+            class="w-full border-2 border-black p-2 bg-[#fdfdfd] focus:outline-none focus:ring-2 focus:ring-black"
+          />
+        </div>
+
+        <button
+          type="submit"
+          id="submit-btn"
+          class="w-full brutal-btn brutal-btn-primary py-2.5 text-center text-xs font-bold mt-2"
+        >
+          ✊🏼 Enviar Solicitud de Editora
+        </button>
+      </form>
+
+      <div class="mt-6 pt-4 border-t border-gray-300 text-center text-xs">
+        <span class="text-gray-600">¿Ya tienes cuenta en la asamblea?</span>
+        <a href="/admin/login" class="font-bold underline text-black hover:text-red-700 block mt-1">
+          Iniciar Sesión aquí →
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script is:inline>
+    const form = document.getElementById('register-form');
+    const errorBox = document.getElementById('error-box');
+    const successBox = document.getElementById('success-box');
+    const submitBtn = document.getElementById('submit-btn');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorBox.classList.add('hidden');
+      successBox.classList.add('hidden');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Enviando solicitud...';
+
+      const displayName = document.getElementById('displayName').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+
+      try {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ displayName, email, password }),
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          successBox.textContent = '¡Solicitud registrada con éxito! Tu cuenta está a la espera de que el Comité Editorial active tu rol de Editora. Redirigiendo a tu panel...';
+          successBox.classList.remove('hidden');
+          setTimeout(() => {
+            window.location.href = '/admin';
+          }, 1200);
+        } else {
+          errorBox.textContent = data.error || 'Error durante el registro.';
+          errorBox.classList.remove('hidden');
+          submitBtn.disabled = false;
+          submitBtn.textContent = '✊🏼 Enviar Solicitud de Editora';
+        }
+      } catch (err) {
+        errorBox.textContent = 'Error de conexión con el servidor.';
+        errorBox.classList.remove('hidden');
+        submitBtn.disabled = false;
+        submitBtn.textContent = '✊🏼 Enviar Solicitud de Editora';
+      }
+    });
+  </script>
+</Layout>

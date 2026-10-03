@@ -1,6 +1,7 @@
 ---
 import type { Article } from '../lib/types';
 import { renderArticleMarkdown } from '../lib/markdown';
+import VoteButton from './VoteButton.astro';
 
 interface Props {
   article: Article;
@@ -52,10 +53,13 @@ const articleUrl = `/articulo/${article.slug}`;
       <p class="font-serif text-sm sm:text-base text-gray-900 leading-relaxed italic border-l-2 border-black pl-3 py-1 bg-white/70">
         {article.excerpt || (article.content.length > 200 ? article.content.substring(0, 200) + '...' : article.content)}
       </p>
-      <div class="pt-1">
+      <div class="pt-2 flex flex-wrap items-center justify-between gap-3">
         <a href={articleUrl} class="brutal-btn text-xs font-bold">
           Leer artículo completo →
         </a>
+        {!isPrintView && (
+          <VoteButton articleId={article.id} initialVotes={article.votes || 0} />
+        )}
       </div>
     </div>
   ) : (
@@ -107,32 +111,52 @@ const articleUrl = `/articulo/${article.slug}`;
         <Fragment set:html={htmlContent} />
       </div>
 
-      <!-- Enlace Fuente Original + QR (Exclusivo en PDF o link en web) -->
-      {article.sourceUrl && (
+      <!-- Enlace Fuente Original o Versión Web + QR (Exclusivo en PDF o link en web) -->
+      {(article.sourceUrl || (isPrintView && qrDataUrl)) && (
         <div class="mt-6 pt-3 border-t border-dashed border-gray-400">
           {isPrintView ? (
             <div class="flex items-center gap-3 border border-black p-2 bg-gray-50 break-inside-avoid fanzine-qr-block">
               {qrDataUrl && (
-                <img src={qrDataUrl} alt="QR Fuente" class="w-16 h-16 border border-black flex-shrink-0" />
+                <img src={qrDataUrl} alt="QR" class="w-16 h-16 border border-black flex-shrink-0" />
               )}
               <div class="font-mono text-[9px] uppercase leading-tight">
-                <span class="font-bold block text-[10px]">ESCANEA PARA LEER FUENTE ORIGINAL:</span>
-                <span class="break-all text-gray-600">{article.sourceUrl}</span>
+                <span class="font-bold block text-[10px]">
+                  {article.sourceUrl ? 'ESCANEA PARA LEER FUENTE ORIGINAL:' : 'ESCANEA PARA LEER EN LA WEB:'}
+                </span>
+                <span class="break-all text-gray-600">{article.sourceUrl || article.title}</span>
               </div>
             </div>
           ) : (
-            <div class="font-mono text-xs flex items-center justify-between">
-              <span class="text-gray-600 uppercase font-semibold">Fuente / Documento Original:</span>
-              <a
-                href={article.sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                class="font-bold underline hover:bg-black hover:text-white px-1 transition-colors"
-              >
-                Consultar Enlace ↗
-              </a>
-            </div>
+            article.sourceUrl && (
+              <div class="font-mono text-xs flex items-center justify-between">
+                <span class="text-gray-600 uppercase font-semibold">Fuente / Documento Original:</span>
+                <a
+                  href={article.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="font-bold underline hover:bg-black hover:text-white px-1 transition-colors"
+                >
+                  Consultar Enlace ↗
+                </a>
+              </div>
+            )
           )}
+        </div>
+      )}
+
+      <!-- Caja de Sindicación y Voto Popular (Exclusiva en Web) -->
+      {!isPrintView && (
+        <div class="mt-8 p-4 border-2 border-black bg-yellow-100 shadow-[4px_4px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-4 font-mono">
+          <div>
+            <div class="flex items-center gap-1.5 font-black text-xs uppercase text-black">
+              <span>★</span>
+              <span>Sindicación y Voto Popular</span>
+            </div>
+            <p class="text-[11px] text-gray-700 leading-tight mt-0.5">
+              Apoya este artículo con puño en alto para asegurar su pase a la edición impresa del fanzine.
+            </p>
+          </div>
+          <VoteButton articleId={article.id} initialVotes={article.votes || 0} />
         </div>
       )}
     </div>

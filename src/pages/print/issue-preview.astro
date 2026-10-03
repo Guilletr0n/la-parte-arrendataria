@@ -1,8 +1,8 @@
 ---
 import Header from '../../components/Header.astro';
-import ArticleCard from '../../components/ArticleCard.astro';
 import { getArticles } from '../../lib/db';
-import { generateQrDataUrl } from '../../lib/qr';
+import { generateQrDataUrl, getArticleQrTargetUrl, getSiteUrl, getDomain } from '../../lib/qr';
+import { renderArticleMarkdown } from '../../lib/markdown';
 import '../../styles/global.css';
 
 export const prerender = false;
@@ -23,7 +23,6 @@ let interiorArticles = allSelected.filter(a => a.fanzineCategory === 'interior' 
 
 // Si no se asignó un Destacado explícito:
 if (destacadoArticles.length === 0 && allSelected.length > 0) {
-  // Tomar un artículo que no esté en portadaArticles para no reducir la selección de portada
   const candidate = allSelected.find(a => !portadaArticles.some(p => p.id === a.id));
   if (candidate) {
     destacadoArticles = [candidate];
@@ -49,16 +48,47 @@ if (interiorArticles.length === 0) {
   }
 }
 
-// Generar códigos QR para fuentes originales
+const siteUrl = getSiteUrl();
+const siteDomain = getDomain();
+
+// Generar códigos QR para TODOS los artículos seleccionados:
+// Si tiene sourceUrl se usa esa fuente original; si no, se genera QR hacia la versión digital en ${siteUrl}/articulo/${art.slug}
 const qrMap = new Map<string, string>();
+const targetUrlMap = new Map<string, string>();
+
 for (const art of allSelected) {
-  if (art.sourceUrl) {
-    const qr = await generateQrDataUrl(art.sourceUrl);
-    qrMap.set(art.id, qr);
-  }
+  const targetUrl = getArticleQrTargetUrl(art);
+  targetUrlMap.set(art.id, targetUrl);
+  const qr = await generateQrDataUrl(targetUrl);
+  qrMap.set(art.id, qr);
 }
 
 const mainDestacado = destacadoArticles[0];
+
+// Serializar datos de artículos interiores para paginación precisa cliente/Puppeteer
+const interiorArticlesData = interiorArticles.map(art => {
+  const htmlContent = renderArticleMarkdown(art.content || '');
+  const formattedDate = new Date(art.createdAt).toLocaleDateString('es-ES', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+  const effectiveUrl = targetUrlMap.get(art.id) || getArticleQrTargetUrl(art);
+  return {
+    id: art.id,
+    title: art.title,
+    author: art.author,
+    authorRole: art.authorRole || 'Redacción',
+    date: formattedDate,
+    photoUrl: art.photoUrl || null,
+    photoCaption: art.photoCaption || null,
+    sourceUrl: art.sourceUrl || null,
+    effectiveUrl: effectiveUrl,
+    hasExternalSource: Boolean(art.sourceUrl && art.sourceUrl.trim().length > 0),
+    qrDataUrl: qrMap.get(art.id) || null,
+    htmlContent: htmlContent,
+  };
+});
 ---
 
 <!doctype html>
@@ -66,315 +96,1086 @@ const mainDestacado = destacadoArticles[0];
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>La Parte Arrendataria — Vista de Impresión Fanzine</title>
+    <title>La Parte Arrendataria — Fanzine Folleto A4 Apaisado</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Playfair+Display:ital,wght@0,700;0,900;1,400;1,700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap"
       rel="stylesheet"
     />
-    <style>
-      /* Simulación de hojas físicas A4 en pantalla */
-      @media screen {
-        body {
-          background-color: #4a4a4a;
-          padding: 20px 0;
-        }
-        .sheet-container {
-          background: #ffffff;
-          width: 210mm;
-          min-height: 297mm;
-          margin: 0 auto 30px auto;
-          padding: 10mm 12mm 15mm 12mm;
-          box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
-          box-sizing: border-box;
-          position: relative;
-        }
+    <style is:global>
+      /* ======================================================== */
+      /* REGLAS GLOBALES Y PANTALLA                               */
+      /* ======================================================== */
+      * {
+        box-sizing: border-box;
       }
 
-      /* Reglas estrictas de impresión A4 */
-      @media print {
-        @page {
-          size: A4 portrait;
-          margin: 10mm 10mm 12mm 10mm;
-        }
-        body {
-          background: #ffffff !important;
-          padding: 0 !important;
-          font-size: 8.25pt !important;
-          line-height: 1.32 !important;
-        }
-        .sheet-container {
-          width: 100% !important;
-          padding: 0 !important;
-          box-shadow: none !important;
-          margin: 0 !important;
-          min-height: 0 !important;
-        }
-        .fanzine-portada-page {
-          height: 274mm !important;
-          max-height: 274mm !important;
-          overflow: hidden !important;
-          page-break-after: always !important;
-          break-after: page !important;
-          page-break-inside: avoid !important;
-          break-inside: avoid !important;
-          display: flex !important;
-          flex-direction: column !important;
-          justify-content: space-between !important;
-        }
-        .fanzine-interior-page {
-          page-break-before: always !important;
-          break-before: page !important;
-        }
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #383838;
+        color: #000000;
+        font-family: 'Playfair Display', Georgia, serif;
       }
 
-      /* Layout Portada: 2 Columnas asimétricas (Ancha para Destacado, Estrecha para Portada) */
-      .fanzine-portada-grid {
+      /* Hojas A4 Apaisadas Físicas (297mm ancho x 210mm alto) */
+      .sheet-a4-landscape {
+        width: 297mm;
+        height: 210mm;
+        min-height: 210mm;
+        max-height: 210mm;
+        background: #ffffff;
+        margin: 0 auto 30px auto;
         display: flex;
-        gap: 6mm;
-        align-items: flex-start;
-        margin-top: 6px;
-        flex: 1;
+        flex-direction: row;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 4px 25px rgba(0, 0, 0, 0.5);
       }
 
-      .fanzine-destacado-col {
-        flex: 1.85;
-        min-width: 0;
+      /* Guía central de plegado a los 148.5 mm */
+      .sheet-fold-guide {
+        position: absolute;
+        left: 148.5mm;
+        top: 0;
+        bottom: 0;
+        width: 0px;
+        border-left: 1px dashed rgba(0, 0, 0, 0.28);
+        z-index: 50;
+        pointer-events: none;
       }
 
-      .fanzine-portada-secondary-col {
-        flex: 1.15;
-        min-width: 0;
-        border-left: 2px solid #000000;
-        padding-left: 5mm;
+      /* Cada media hoja A4 (Página A5: 148.5mm x 210mm) */
+      .half-page {
+        width: 148.5mm;
+        height: 210mm;
+        min-height: 210mm;
+        max-height: 210mm;
+        overflow: hidden;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        background: #ffffff;
       }
 
-      /* Flujo continuo de 3 columnas para páginas interiores */
-      .fanzine-editorial-flow {
-        column-count: 3;
+      /* Márgenes asimétricos para respetar el lomo/plegado central (10mm en el lomo) */
+      .half-page-left {
+        padding: 7mm 10mm 7mm 8mm; /* Lomo a la derecha */
+      }
+
+      .half-page-right {
+        padding: 7mm 8mm 7mm 10mm; /* Lomo a la izquierda */
+      }
+
+      /* ======================================================== */
+      /* CABECERAS Y PIES DE PÁGINA INTERIORES                     */
+      /* ======================================================== */
+      .interior-page-header {
+        height: 7mm;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-family: 'Space Mono', monospace;
+        font-size: 7.5pt;
+        text-transform: uppercase;
+        font-weight: bold;
+        border-bottom: 1.5px solid #000000;
+        margin-bottom: 2.5mm;
+        padding-bottom: 1mm;
+        flex-shrink: 0;
+      }
+
+      /* Contenedor de flujo editorial a 2 columnas para cada página A5 */
+      .interior-page-content {
+        width: 130.5mm;
+        height: 184mm;
+        column-count: 2;
         column-gap: 5mm;
         column-rule: 1px solid #111111;
+        column-fill: auto;
+        overflow: hidden;
         text-align: justify;
+        text-justify: inter-word;
         hyphens: auto;
+        font-size: 8pt;
+        line-height: 1.32;
+        color: #111111;
       }
 
-      /* Tipografía compacta de cuerpo */
-      .fanzine-editorial-flow :global(.prose) {
-        font-size: 8.25pt !important;
+      /* Estilos para el texto de los artículos en columnas */
+      .interior-page-content p {
+        margin: 0 0 5px 0 !important;
+        font-size: 8pt !important;
         line-height: 1.32 !important;
-      }
-
-      .fanzine-editorial-flow :global(.prose p) {
-        font-size: 8.25pt !important;
-        line-height: 1.32 !important;
-        margin-top: 0 !important;
-        margin-bottom: 0.45rem !important;
         text-align: justify !important;
         text-justify: inter-word !important;
         hyphens: auto !important;
-        text-wrap: pretty !important;
-      }
-
-      /* Titulares sin espacios gigantescos: alineados a la izquierda y balanceados */
-      .fanzine-article-header h2,
-      .fanzine-editorial-flow :global(h1),
-      .fanzine-editorial-flow :global(h2),
-      .fanzine-editorial-flow :global(h3),
-      .fanzine-editorial-flow :global(h4),
-      .fanzine-editorial-flow :global(.fanzine-article-header h2) {
-        text-align: left !important;
-        text-wrap: balance !important;
-        hyphens: manual !important;
         word-spacing: normal !important;
       }
 
-      /* Flujo continuo: los artículos se conectan directamente en la misma columna */
-      .fanzine-article-block {
-        break-inside: auto !important;
-        page-break-inside: auto !important;
-        margin-bottom: 1.25rem !important;
-        padding-bottom: 1rem !important;
-        border-bottom: 2px dashed #444444 !important;
-      }
-
-      .fanzine-article-block:last-child {
-        border-bottom: none !important;
+      .interior-page-content h1,
+      .interior-page-content h2,
+      .interior-page-content h3,
+      .interior-page-content h4,
+      .interior-page-content h2.article-title {
+        font-family: 'Playfair Display', Georgia, serif !important;
+        font-size: 9.5pt !important;
+        font-weight: 900 !important;
+        text-transform: uppercase !important;
+        line-height: 1.15 !important;
+        margin: 5px 0 3px 0 !important;
+        text-align: left !important;
+        text-wrap: balance !important;
+        word-spacing: normal !important;
+        break-after: avoid !important;
       }
 
       .fanzine-article-header {
         break-inside: avoid !important;
         break-after: avoid !important;
-        page-break-after: avoid !important;
+        margin-bottom: 4px !important;
       }
 
-      .fanzine-article-block figure,
-      .fanzine-article-block img,
-      .fanzine-qr-block {
-        break-inside: avoid !important;
-        page-break-inside: avoid !important;
+      .fanzine-article-header .meta-row {
+        font-family: 'Space Mono', monospace;
+        font-size: 6.5pt;
+        text-transform: uppercase;
+        color: #444444;
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        margin-bottom: 1px;
       }
 
-      /* Texto de cajas aside sin huecos */
-      .fanzine-editorial-flow :global(.editorial-aside) {
+      .role-badge {
+        background: #000000;
+        color: #ffffff;
+        font-weight: bold;
+        padding: 0.5px 2.5px;
+        font-size: 6pt;
+      }
+
+      /* Despieces asides en interior */
+      .interior-page-content .editorial-aside {
         float: none !important;
         width: 100% !important;
-        margin: 6px 0 8px 0 !important;
         clear: both !important;
+        box-sizing: border-box !important;
+        border-left: 2.5px solid #000000 !important;
+        background: #f4f4f4 !important;
+        padding: 3px 5px !important;
+        margin: 5px 0 !important;
         break-inside: avoid !important;
-        page-break-inside: avoid !important;
+        font-size: 7.75pt !important;
+        line-height: 1.28 !important;
         text-align: left !important;
       }
 
-      .fanzine-editorial-flow :global(.editorial-aside-content p) {
-        font-size: 8.5pt !important;
-        line-height: 1.35 !important;
+      .interior-page-content .editorial-aside p {
+        font-size: 7.75pt !important;
+        line-height: 1.28 !important;
+        margin: 0 !important;
         text-align: left !important;
-        word-spacing: normal !important;
+      }
+
+      /* Fotografías en interior */
+      .article-photo-block {
+        margin: 4px 0 !important;
+        break-inside: avoid !important;
+      }
+
+      .article-photo-block img {
+        width: 100%;
+        height: 38mm !important;
+        max-height: 38mm !important;
+        object-fit: cover;
+        border: 1.5px solid #000000;
+        display: block;
+      }
+
+      .article-photo-block figcaption {
+        font-family: 'Space Mono', monospace;
+        font-size: 6pt;
+        color: #444;
+        margin-top: 1px;
+        font-style: italic;
+      }
+
+      /* Separador entre artículos continuos */
+      .fanzine-article-separator {
+        border-top: 1.5px dashed #444444;
+        margin: 8px 0 6px 0;
+        break-inside: avoid;
+      }
+
+      /* QR Normal al finalizar artículo completo */
+      .article-qr-normal {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        border: 1px solid #000000;
+        padding: 3px;
+        background: #fafafa;
+        margin: 5px 0;
+        break-inside: avoid;
+      }
+
+      .article-qr-normal img {
+        width: 13mm;
+        height: 13mm;
+        border: 1px solid #000;
+        flex-shrink: 0;
+      }
+
+      .article-qr-normal .qr-normal-text {
+        font-family: 'Space Mono', monospace;
+        font-size: 6pt;
+        text-transform: uppercase;
+        line-height: 1.15;
+      }
+
+      .article-qr-normal .qr-normal-title {
+        font-weight: bold;
+        display: block;
+      }
+
+      .article-qr-normal .qr-normal-url {
+        color: #555;
+        word-break: break-all;
+      }
+
+      /* ======================================================== */
+      /* REQUISITO 2: CORTE DE ARTÍCULO Y QR FINAL                */
+      /* ======================================================== */
+      .cutoff-qr-block {
+        width: 100% !important;
+        box-sizing: border-box !important;
+        clear: both !important;
+        border: 2px solid #000000;
+        background: #fffbe6;
+        padding: 4px;
+        margin: 5px 0 0 0;
+        break-inside: avoid;
+        box-shadow: 2px 2px 0px #000000;
+      }
+
+      .cutoff-bar {
+        background: #000000;
+        color: #ffffff;
+        font-family: 'Space Mono', monospace;
+        font-size: 6.5pt;
+        font-weight: bold;
+        text-align: center;
+        text-transform: uppercase;
+        padding: 1.5px 0;
+        margin-bottom: 3px;
+      }
+
+      .cutoff-flex {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .cutoff-qr-img {
+        width: 17mm;
+        height: 17mm;
+        border: 1.5px solid #000000;
+        flex-shrink: 0;
+        background: #ffffff;
+      }
+
+      .cutoff-meta {
+        font-family: 'Space Mono', monospace;
+        font-size: 6.5pt;
+        text-transform: uppercase;
+        line-height: 1.2;
+      }
+
+      .cutoff-meta .cutoff-title {
+        font-weight: 900;
+        color: #000000;
+        display: block;
+        margin-bottom: 1.5px;
+      }
+
+      .cutoff-meta .cutoff-url {
+        color: #444444;
+        word-break: break-all;
+        font-size: 6pt;
+        display: block;
+      }
+
+      /* ======================================================== */
+      /* PÁGINA 1: PORTADA EN FORMATO A5 (148.5mm x 210mm)        */
+      /* ======================================================== */
+      .portada-a5-container {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        height: 100%;
+        width: 100%;
+      }
+
+      .portada-header-compact {
+        border-bottom: 2px solid #000000;
+        padding-bottom: 2mm;
+        margin-bottom: 2mm;
+      }
+
+      .portada-header-top-meta {
+        display: flex;
+        justify-content: space-between;
+        font-family: 'Space Mono', monospace;
+        font-size: 6.5pt;
+        font-weight: bold;
+        text-transform: uppercase;
+        border-bottom: 1px solid #000;
+        padding-bottom: 1px;
+        margin-bottom: 2px;
+      }
+
+      .portada-title-box {
+        text-align: center;
+        padding: 1px 0;
+      }
+
+      .portada-title-sub {
+        font-family: 'Space Mono', monospace;
+        font-size: 8pt;
+        letter-spacing: 0.22em;
+        font-weight: bold;
+        text-transform: uppercase;
+        margin: 0;
+      }
+
+      .portada-title-main {
+        font-family: 'Playfair Display', Georgia, serif;
+        font-size: 20pt;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: -0.02em;
+        line-height: 0.95;
+        border: 2.5px solid #000;
+        display: inline-block;
+        padding: 1px 12px;
+        background: #ffffff;
+        box-shadow: 2.5px 2.5px 0px #000;
+        margin: 1px 0;
+      }
+
+      .portada-title-motto {
+        font-family: 'Space Mono', monospace;
+        font-size: 6pt;
+        font-style: italic;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #444;
+        margin: 1px 0 0 0;
+      }
+
+      /* Portada Grid: Destacado + Sumario Secundario */
+      .portada-content-flex {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 2mm;
+      }
+
+      /* Bloque Destacado de Portada */
+      .destacado-portada-box {
+        border: 1.5px solid #000000;
+        padding: 5px;
+        background: #ffffff;
+        box-shadow: 2px 2px 0px #000000;
+      }
+
+      .destacado-badge-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-family: 'Space Mono', monospace;
+        font-size: 6pt;
+        font-weight: bold;
+        text-transform: uppercase;
+        border-bottom: 1px solid #000;
+        padding-bottom: 2px;
+        margin-bottom: 3px;
+      }
+
+      .destacado-badge-tag {
+        background: #000;
+        color: #fff;
+        padding: 0.5px 3px;
+      }
+
+      .destacado-title-text {
+        font-family: 'Playfair Display', Georgia, serif;
+        font-size: 11pt;
+        font-weight: 900;
+        text-transform: uppercase;
+        line-height: 1.15;
+        margin: 2px 0 3px 0;
+        text-align: left;
+      }
+
+      .destacado-columns-split {
+        display: flex;
+        gap: 6px;
+        align-items: flex-start;
+      }
+
+      .destacado-img-wrap {
+        width: 48mm;
+        flex-shrink: 0;
+      }
+
+      .destacado-img-wrap img {
+        width: 100%;
+        height: 32mm;
+        object-fit: cover;
+        border: 1px solid #000;
+        display: block;
+      }
+
+      .destacado-img-wrap figcaption {
+        font-family: 'Space Mono', monospace;
+        font-size: 5.5pt;
+        color: #555;
+        margin-top: 1px;
+        font-style: italic;
+      }
+
+      .destacado-excerpt-wrap {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
+      .destacado-excerpt-p {
+        font-size: 7.5pt;
+        line-height: 1.25;
+        font-style: italic;
+        margin: 0 0 3px 0;
+        color: #111;
+        border-left: 2px solid #000;
+        padding-left: 4px;
+        background: #fdfdfd;
+      }
+
+      .destacado-qr-mini {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        border: 1px solid #000;
+        padding: 2px;
+        background: #f9f9f9;
+      }
+
+      .destacado-qr-mini img {
+        width: 10mm;
+        height: 10mm;
+        border: 0.5px solid #000;
+        flex-shrink: 0;
+      }
+
+      .destacado-qr-mini span {
+        font-family: 'Space Mono', monospace;
+        font-size: 5.5pt;
+        text-transform: uppercase;
+        line-height: 1.1;
+      }
+
+      /* Sumario de Noticias Secundarias de Portada */
+      .portada-sumario-box {
+        border-top: 1.5px solid #000000;
+        padding-top: 3px;
+      }
+
+      .portada-sumario-title {
+        font-family: 'Space Mono', monospace;
+        font-size: 7pt;
+        font-weight: bold;
+        text-transform: uppercase;
+        margin-bottom: 3px;
+        display: flex;
+        justify-content: space-between;
+      }
+
+      .portada-sumario-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(38mm, 1fr));
+        gap: 5px;
+      }
+
+      .portada-sumario-item {
+        border: 1px dashed #777;
+        padding: 3px 4px;
+        background: #fafafa;
+      }
+
+      .portada-sumario-item h3 {
+        font-family: 'Playfair Display', Georgia, serif;
+        font-size: 8.5pt;
+        font-weight: bold;
+        text-transform: uppercase;
+        line-height: 1.15;
+        margin: 0 0 2px 0;
+      }
+
+      .portada-sumario-item p {
+        font-size: 7pt;
+        line-height: 1.2;
+        margin: 0;
+        font-style: italic;
+        color: #333;
+      }
+
+      .portada-footer {
+        border-top: 1.5px solid #000000;
+        padding-top: 1.5mm;
+        display: flex;
+        justify-content: space-between;
+        font-family: 'Space Mono', monospace;
+        font-size: 6.5pt;
+        font-weight: bold;
+        text-transform: uppercase;
+      }
+
+      /* ======================================================== */
+      /* PÁGINA 8: CONTRAPORTADA O PÁGINA FINAL                   */
+      /* ======================================================== */
+      .page-empty-watermark {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: #aaaaaa;
+        font-family: 'Space Mono', monospace;
+        font-size: 8pt;
+        text-transform: uppercase;
+        border: 1px dashed #cccccc;
+        margin: 10mm 0;
+      }
+
+      /* ======================================================== */
+      /* REGLAS ESTRICTAS DE IMPRESIÓN A4 APAISADO                */
+      /* ======================================================== */
+      @page {
+        size: A4 landscape;
+        margin: 0;
+      }
+
+      @media print {
+        html, body {
+          width: 297mm !important;
+          height: 210mm !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          background: #ffffff !important;
+        }
+
+        .no-print {
+          display: none !important;
+        }
+
+        .sheet-a4-landscape {
+          width: 297mm !important;
+          height: 210mm !important;
+          max-height: 210mm !important;
+          overflow: hidden !important;
+          page-break-after: always !important;
+          break-after: page !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          box-shadow: none !important;
+          border: none !important;
+          display: flex !important;
+          flex-direction: row !important;
+          box-sizing: border-box !important;
+        }
+
+        .sheet-fold-guide {
+          border-left: 0.5px dashed #cccccc !important;
+        }
+
+        .page-empty-watermark {
+          display: none !important;
+        }
       }
     </style>
   </head>
-  <body class="text-black font-serif">
-    <!-- Barra superior de control (sólo visible en navegador) -->
-    <div class="no-print max-w-[210mm] mx-auto mb-4 bg-yellow-300 border-2 border-black p-3 flex flex-wrap justify-between items-center font-mono text-xs shadow-[3px_3px_0px_#000]">
-      <div>
-        <span class="font-bold">FANZINE IMPRESO (A4)</span> — Portada: <strong>1 Destacado + {portadaArticles.length} Portada</strong> | Interiores: <strong>{interiorArticles.length} Artículos (3 Columnas Continuas)</strong>
+  <body>
+    <!-- Barra de control superior para el navegador -->
+    <div class="no-print max-w-[297mm] mx-auto mb-4 bg-yellow-300 border-2 border-black p-3 font-mono text-xs shadow-[3px_3px_0px_#000]">
+      <div class="flex flex-wrap justify-between items-center gap-2 mb-2 pb-2 border-b border-black">
+        <div>
+          <span class="font-bold uppercase text-red-700">FANZINE A4 APAISADO (FOLLETO 2 HOJAS / 4 CARAS PLEGADAS AL CENTRO)</span>
+          <div class="text-[11px] text-gray-800">
+            Total: <strong>8 Páginas A5</strong> encartadas • Portada: <strong>1 Destacado + {portadaArticles.length} Portada</strong> • Interiores: <strong>{interiorArticles.length} Artículos con corte continuo</strong>
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="window.print()" class="brutal-btn brutal-btn-primary text-xs py-1 px-3">
+            🖨️ Imprimir Navegador (A4 Apaisado)
+          </button>
+          <a href="/api/fanzine/export" class="brutal-btn text-xs py-1 px-3 bg-red-600 text-white hover:bg-red-700">
+            📥 Descargar PDF Puppeteer
+          </a>
+          <a href="/admin/export-fanzine" class="brutal-btn text-xs py-1 px-3">
+            ← Volver al Selector
+          </a>
+        </div>
       </div>
-      <div class="flex gap-2">
-        <button onclick="window.print()" class="brutal-btn brutal-btn-primary text-xs py-1 px-3">
-          🖨️ Imprimir Navegador
-        </button>
-        <a href="/api/fanzine/export" class="brutal-btn text-xs py-1 px-3 bg-red-600 text-white hover:bg-red-700">
-          📥 Descargar PDF Puppeteer
-        </a>
-        <a href="/admin/export-fanzine" class="brutal-btn text-xs py-1 px-3">
-          ← Volver al Selector
-        </a>
+      <div class="text-[10.5px] text-gray-700 flex justify-between items-center">
+        <span>📖 <strong>Instrucciones Papelería:</strong> Imprimir las 2 hojas a doble cara (voltear por borde corto). Doblar cada hoja por la mitad (148.5 mm) e insertar Hoja 2 dentro de Hoja 1.</span>
+        <span class="font-bold bg-white px-2 py-0.5 border border-black">8 Páginas A5</span>
       </div>
     </div>
 
-    <!-- ========================================== -->
-    <!-- HOJA 1: LA PORTADA (Layout Asimétrico)     -->
-    <!-- ========================================== -->
-    <div class="sheet-container fanzine-portada-page">
-      <!-- Cabecera Editorial Principal -->
-      <Header isPrintView={true} />
+    <!-- ======================================================== -->
+    <!-- HOJA 1: CARA EXTERIOR (ANVERSO)                          -->
+    <!-- Izquierda: Pág 8 (Contraportada) | Derecha: Pág 1 (Portada) -->
+    <!-- ======================================================== -->
+    <div class="no-print max-w-[297mm] mx-auto mb-1 flex justify-between items-center text-[10px] font-mono bg-black text-white px-3 py-1 font-bold">
+      <span>HOJA 1 (CARA EXTERIOR) — IMPRESIÓN ANVERSO</span>
+      <span class="text-yellow-300">Pág. 8 (Contraportada / Final) [IZQ] ◀ | ▶ Pág. 1 (Portada) [DER]</span>
+    </div>
 
-      <!-- Cuadrícula de Portada: Columna Ancha (Destacado) + Columna Estrecha (Portada) -->
-      <div class="fanzine-portada-grid">
-        <!-- 1. ARTÍCULO DESTACADO (Columna Ancha y Titular más Grande) -->
-        {mainDestacado && (
-          <section class="fanzine-destacado-col">
-            <div class="mb-1.5 flex items-center justify-between font-mono text-[8.5px] uppercase tracking-wider text-gray-700 border-b border-black pb-0.5">
-              <span class="bg-black text-white px-1 py-0.5 font-bold">★ TEMA PRINCIPAL DE PORTADA</span>
-              <span>Por {mainDestacado.author} • {new Date(mainDestacado.createdAt).toLocaleDateString('es-ES')}</span>
+    <div class="sheet-a4-landscape" id="sheet-1-front">
+      <!-- Guía central de plegado -->
+      <div class="sheet-fold-guide"></div>
+
+      <!-- MITAD IZQUIERDA: PÁGINA 8 (CONTRAPORTADA / INTERIOR FINAL) -->
+      <div class="half-page half-page-left" id="page-8-container">
+        <div class="interior-page-header">
+          <span>LA PARTE ARRENDATARIA — EDICIÓN IMPRESA POPULAR</span>
+          <span>PÁG. 08</span>
+        </div>
+        <div class="interior-page-content" id="content-p8" data-page="8"></div>
+        <div class="portada-footer" style="margin-top: 1mm;">
+          <span>{siteDomain}</span>
+          <span>FINAL DEL FANZINE</span>
+        </div>
+      </div>
+
+      <!-- MITAD DERECHA: PÁGINA 1 (PORTADA PRINCIPAL) -->
+      <div class="half-page half-page-right" id="page-1-container">
+        <div class="portada-a5-container">
+          <!-- Cabecera de Portada -->
+          <header class="portada-header-compact">
+            <div class="portada-header-top-meta">
+              <span>España</span>
+              <span>{new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long' })}</span>
+              <span>{siteDomain}</span>
             </div>
+            <div class="portada-title-box">
+              <div class="portada-title-sub">LA PARTE</div>
+              <h1 class="portada-title-main">ARRENDATARIA</h1>
+              <p class="portada-title-motto">Prensa de guerrilla editorial y contrainformación inquilina</p>
+            </div>
+          </header>
 
-            <!-- Titular Grande de Portada -->
-            <h2 class="text-xl sm:text-2xl font-black font-serif uppercase tracking-tight leading-tight text-black mb-2">
-              {mainDestacado.title}
-            </h2>
-
-            <!-- Fotografía Principal con Trama Halftone -->
-            {mainDestacado.photoUrl && (
-              <figure class="my-2">
-                <div class="border-2 border-black overflow-hidden bg-black shadow-[2px_2px_0px_#000]">
-                  <img
-                    src={mainDestacado.photoUrl}
-                    alt={mainDestacado.photoCaption || mainDestacado.title}
-                    class="w-full h-auto object-cover max-h-[170px] halftone-img block"
-                  />
+          <!-- Contenido de Portada -->
+          <div class="portada-content-flex">
+            <!-- 1. ARTÍCULO DESTACADO -->
+            {mainDestacado && (
+              <section class="destacado-portada-box">
+                <div class="destacado-badge-bar">
+                  <span class="destacado-badge-tag">★ TEMA PRINCIPAL DE PORTADA</span>
+                  <span>Por {mainDestacado.author}</span>
                 </div>
-                {mainDestacado.photoCaption && (
-                  <figcaption class="font-mono text-[8.5px] text-gray-700 mt-0.5 italic border-l-2 border-black pl-1.5">
-                    ▲ {mainDestacado.photoCaption}
-                  </figcaption>
-                )}
-              </figure>
+                <h2 class="destacado-title-text">{mainDestacado.title}</h2>
+                <div class="destacado-columns-split">
+                  {mainDestacado.photoUrl && (
+                    <figure class="destacado-img-wrap">
+                      <img src={mainDestacado.photoUrl} alt={mainDestacado.photoCaption || mainDestacado.title} class="halftone-img" />
+                      {mainDestacado.photoCaption && (
+                        <figcaption>▲ {mainDestacado.photoCaption}</figcaption>
+                      )}
+                    </figure>
+                  )}
+                  <div class="destacado-excerpt-wrap">
+                    <p class="destacado-excerpt-p">
+                      "{mainDestacado.excerpt || (mainDestacado.content.substring(0, 160) + '...')}"
+                    </p>
+                    {qrMap.get(mainDestacado.id) && (
+                      <div class="destacado-qr-mini">
+                        <img src={qrMap.get(mainDestacado.id)} alt="QR" />
+                        <span><strong>{mainDestacado.sourceUrl ? 'FUENTE ORIGINAL:' : 'LEER EN LA WEB:'}</strong><br/>{(targetUrlMap.get(mainDestacado.id) || siteUrl).substring(0, 35)}...</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </section>
             )}
 
-            <!-- Extracto Destacado en Caja Editorial -->
-            <div class="fanzine-destacado-excerpt bg-gray-50 border-l-4 border-black p-2.5 my-2 shadow-[2px_2px_0px_rgba(0,0,0,0.1)]">
-              <p class="font-serif text-[10pt] sm:text-[10.5pt] leading-snug text-black italic m-0">
-                "{mainDestacado.excerpt || (mainDestacado.content.substring(0, 220) + '...')}"
-              </p>
-            </div>
-
-            <!-- Código QR a la Fuente Original -->
-            {mainDestacado.sourceUrl && qrMap.get(mainDestacado.id) && (
-              <div class="flex items-center gap-2 border border-black p-1.5 bg-white my-2">
-                <img src={qrMap.get(mainDestacado.id)} alt="QR" class="w-10 h-10 border border-black flex-shrink-0" />
-                <div class="font-mono text-[7.5px] uppercase leading-tight">
-                  <span class="font-bold block">VERSIÓN DIGITAL / FUENTE OFICIAL:</span>
-                  <span class="break-all text-gray-600">{mainDestacado.sourceUrl}</span>
+            <!-- 2. NOTICIAS EN PORTADA (SUMARIO) -->
+            {portadaArticles.length > 0 && (
+              <section class="portada-sumario-box">
+                <div class="portada-sumario-title">
+                  <span>NOTICIAS EN PORTADA</span>
+                  <span class="bg-yellow-300 px-1 border border-black">SUMARIO ({portadaArticles.length})</span>
                 </div>
+                <div class="portada-sumario-grid">
+                  {portadaArticles.slice(0, 3).map(art => (
+                    <article class="portada-sumario-item">
+                      <h3>{art.title}</h3>
+                      <p>"{art.excerpt || (art.content.substring(0, 95) + '...')}"</p>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
+
+          <!-- Pie de Portada -->
+          <footer class="portada-footer">
+            <span>EDICIÓN IMPRESA POPULAR</span>
+            <span>CONTINÚA EN PÁGINA 2 ➔</span>
+          </footer>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- HOJA 1: CARA INTERIOR (REVERSO)                          -->
+    <!-- Izquierda: Pág 2 | Derecha: Pág 7                        -->
+    <!-- ======================================================== -->
+    <div class="no-print max-w-[297mm] mx-auto mb-1 flex justify-between items-center text-[10px] font-mono bg-black text-white px-3 py-1 font-bold">
+      <span>HOJA 1 (CARA INTERIOR) — IMPRESIÓN REVERSO (Al dorso de Hoja 1)</span>
+      <span class="text-yellow-300">Pág. 2 [IZQ] ◀ | ▶ Pág. 7 [DER]</span>
+    </div>
+
+    <div class="sheet-a4-landscape" id="sheet-1-back">
+      <div class="sheet-fold-guide"></div>
+
+      <!-- MITAD IZQUIERDA: PÁGINA 2 -->
+      <div class="half-page half-page-left" id="page-2-container">
+        <div class="interior-page-header">
+          <span>LA PARTE ARRENDATARIA — EDICIÓN IMPRESA POPULAR</span>
+          <span>PÁG. 02</span>
+        </div>
+        <div class="interior-page-content" id="content-p2" data-page="2"></div>
+        <div class="portada-footer" style="margin-top: 1mm;">
+          <span>PÁGINAS INTERIORES</span>
+          <span>PÁG. 02</span>
+        </div>
+      </div>
+
+      <!-- MITAD DERECHA: PÁGINA 7 -->
+      <div class="half-page half-page-right" id="page-7-container">
+        <div class="interior-page-header">
+          <span>LA PARTE ARRENDATARIA — EDICIÓN IMPRESA POPULAR</span>
+          <span>PÁG. 07</span>
+        </div>
+        <div class="interior-page-content" id="content-p7" data-page="7"></div>
+        <div class="portada-footer" style="margin-top: 1mm;">
+          <span>PÁGINAS INTERIORES</span>
+          <span>PÁG. 07</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- HOJA 2: CARA INTERMEDIA (ANVERSO)                        -->
+    <!-- Izquierda: Pág 6 | Derecha: Pág 3                        -->
+    <!-- ======================================================== -->
+    <div class="no-print max-w-[297mm] mx-auto mb-1 flex justify-between items-center text-[10px] font-mono bg-black text-white px-3 py-1 font-bold">
+      <span>HOJA 2 (CARA INTERMEDIA) — IMPRESIÓN ANVERSO</span>
+      <span class="text-yellow-300">Pág. 6 [IZQ] ◀ | ▶ Pág. 3 [DER]</span>
+    </div>
+
+    <div class="sheet-a4-landscape" id="sheet-2-front">
+      <div class="sheet-fold-guide"></div>
+
+      <!-- MITAD IZQUIERDA: PÁGINA 6 -->
+      <div class="half-page half-page-left" id="page-6-container">
+        <div class="interior-page-header">
+          <span>LA PARTE ARRENDATARIA — EDICIÓN IMPRESA POPULAR</span>
+          <span>PÁG. 06</span>
+        </div>
+        <div class="interior-page-content" id="content-p6" data-page="6"></div>
+        <div class="portada-footer" style="margin-top: 1mm;">
+          <span>PÁGINAS INTERIORES</span>
+          <span>PÁG. 06</span>
+        </div>
+      </div>
+
+      <!-- MITAD DERECHA: PÁGINA 3 -->
+      <div class="half-page half-page-right" id="page-3-container">
+        <div class="interior-page-header">
+          <span>LA PARTE ARRENDATARIA — EDICIÓN IMPRESA POPULAR</span>
+          <span>PÁG. 03</span>
+        </div>
+        <div class="interior-page-content" id="content-p3" data-page="3"></div>
+        <div class="portada-footer" style="margin-top: 1mm;">
+          <span>PÁGINAS INTERIORES</span>
+          <span>PÁG. 03</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- HOJA 2: PLIEGO CENTRAL (REVERSO / CENTRO DEL LIBRITO)    -->
+    <!-- Izquierda: Pág 4 | Derecha: Pág 5                        -->
+    <!-- ======================================================== -->
+    <div class="no-print max-w-[297mm] mx-auto mb-1 flex justify-between items-center text-[10px] font-mono bg-black text-white px-3 py-1 font-bold">
+      <span>HOJA 2 (PLIEGO CENTRAL / GRAPA) — IMPRESIÓN REVERSO (Al dorso de Hoja 2)</span>
+      <span class="text-yellow-300">Pág. 4 [IZQ] ◀ | ▶ Pág. 5 (Centro del librito) [DER]</span>
+    </div>
+
+    <div class="sheet-a4-landscape" id="sheet-2-back">
+      <div class="sheet-fold-guide"></div>
+
+      <!-- MITAD IZQUIERDA: PÁGINA 4 -->
+      <div class="half-page half-page-left" id="page-4-container">
+        <div class="interior-page-header">
+          <span>LA PARTE ARRENDATARIA — EDICIÓN IMPRESA POPULAR</span>
+          <span>PÁG. 04</span>
+        </div>
+        <div class="interior-page-content" id="content-p4" data-page="4"></div>
+        <div class="portada-footer" style="margin-top: 1mm;">
+          <span>PLIEGO CENTRAL</span>
+          <span>PÁG. 04</span>
+        </div>
+      </div>
+
+      <!-- MITAD DERECHA: PÁGINA 5 -->
+      <div class="half-page half-page-right" id="page-5-container">
+        <div class="interior-page-header">
+          <span>LA PARTE ARRENDATARIA — EDICIÓN IMPRESA POPULAR</span>
+          <span>PÁG. 05</span>
+        </div>
+        <div class="interior-page-content" id="content-p5" data-page="5"></div>
+        <div class="portada-footer" style="margin-top: 1mm;">
+          <span>PLIEGO CENTRAL</span>
+          <span>PÁG. 05</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Datos serializados para el motor de paginación editorial -->
+    <script id="interior-data" type="application/json" set:html={JSON.stringify(interiorArticlesData)} />
+
+    <!-- ======================================================== -->
+    <!-- SCRIPT DE PAGINACIÓN EDITORIAL CONTINUA Y CORTE CON QR   -->
+    <!-- ======================================================== -->
+    <script is:inline>
+      async function paginateBooklet() {
+        await document.fonts.ready;
+
+        const dataScript = document.getElementById('interior-data');
+        if (!dataScript) return;
+        const articles = JSON.parse(dataScript.textContent || '[]');
+
+        // Slots de páginas interiores en el orden de lectura estricto (Páginas 2 a 8)
+        const pageNumbers = [2, 3, 4, 5, 6, 7, 8];
+        const pageSlots = pageNumbers.map(n => document.getElementById('content-p' + n)).filter(Boolean);
+
+        // Limpiar los contenedores por si se recarga
+        pageSlots.forEach(slot => {
+          slot.innerHTML = '';
+        });
+
+        let currentSlotIdx = 0;
+        let isBookletFinished = false;
+
+        for (let aIdx = 0; aIdx < articles.length; aIdx++) {
+          if (isBookletFinished || currentSlotIdx >= pageSlots.length) break;
+
+          const art = articles[aIdx];
+          const isFirstArticleInBooklet = (aIdx === 0);
+
+          // 1. Crear elementos individuales del artículo
+          const elementsToInsert = [];
+
+          // Separador si no es el primer artículo del fanzine
+          if (!isFirstArticleInBooklet) {
+            const sep = document.createElement('div');
+            sep.className = 'fanzine-article-separator';
+            elementsToInsert.push(sep);
+          }
+
+          // Header del artículo
+          const header = document.createElement('div');
+          header.className = 'fanzine-article-header';
+          header.innerHTML = `
+            <div class="meta-row">
+              <span class="role-badge">${art.authorRole.toUpperCase()}</span>
+              <span><strong>${art.author}</strong> • ${art.date}</span>
+            </div>
+            <h2 class="article-title">${art.title}</h2>
+          `;
+          elementsToInsert.push(header);
+
+          // Foto (si existe)
+          if (art.photoUrl) {
+            const fig = document.createElement('figure');
+            fig.className = 'article-photo-block';
+            fig.innerHTML = `
+              <img src="${art.photoUrl}" alt="${art.photoCaption || art.title}" class="halftone-img" />
+              ${art.photoCaption ? `<figcaption>▲ ${art.photoCaption}</figcaption>` : ''}
+            `;
+            elementsToInsert.push(fig);
+          }
+
+          // Parsear bloques HTML del markdown
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(art.htmlContent || '', 'text/html');
+          const bodyChildren = Array.from(doc.body.children);
+          
+          // Si el primer hijo es un titular H1/H2 idéntico al título del artículo, omitirlo para no duplicar
+          if (bodyChildren.length > 0) {
+            const first = bodyChildren[0];
+            if (['H1', 'H2', 'H3'].includes(first.tagName) && 
+                first.textContent.trim().toUpperCase() === art.title.trim().toUpperCase()) {
+              bodyChildren.shift();
+            }
+          }
+
+          bodyChildren.forEach(child => elementsToInsert.push(child));
+
+          // Bloque QR regular de finalización completa de artículo
+          let qrNormalBlock = null;
+          if (art.qrDataUrl) {
+            qrNormalBlock = document.createElement('div');
+            qrNormalBlock.className = 'article-qr-normal';
+            qrNormalBlock.innerHTML = `
+              <img src="${art.qrDataUrl}" alt="QR" />
+              <div class="qr-normal-text">
+                <span class="qr-normal-title">${art.hasExternalSource ? 'ESCANEA PARA LEER FUENTE ORIGINAL:' : 'ESCANEA PARA LEER EN LA WEB:'}</span>
+                <span class="qr-normal-url">${art.effectiveUrl}</span>
               </div>
-            )}
+            `;
+          }
 
-            <div class="font-mono text-[8.5px] uppercase font-bold text-gray-700 mt-2 pt-1 border-t border-dashed border-gray-400">
-              [ Continúa en páginas interiores ➔ ]
-            </div>
-          </section>
-        )}
+          // 2. Insertar elementos distribuyendo a través de los slots de página
+          for (let eIdx = 0; eIdx < elementsToInsert.length; eIdx++) {
+            if (isBookletFinished || currentSlotIdx >= pageSlots.length) break;
 
-        <!-- 2. ARTÍCULOS DE PORTADA (Columna más Estrecha y Titulares Secundarios) -->
-        <aside class="fanzine-portada-secondary-col">
-          <div class="border-b-2 border-black pb-1 mb-2 flex items-center justify-between font-mono text-[8.5px] uppercase font-bold text-black">
-            <span>NOTICIAS EN PORTADA</span>
-            <span class="bg-yellow-300 px-1 border border-black">SUMARIO ({portadaArticles.length})</span>
-          </div>
+            const el = elementsToInsert[eIdx];
+            const currentSlot = pageSlots[currentSlotIdx];
+            const isLastPage = (currentSlotIdx === pageSlots.length - 1);
 
-          <div class="space-y-2.5">
-            {portadaArticles.map((art) => (
-              <article class="border-b border-dashed border-gray-400 pb-2 last:border-b-0">
-                <div class="font-mono text-[7.5pt] uppercase text-gray-600 mb-0.5">
-                  Por {art.author} • {new Date(art.createdAt).toLocaleDateString('es-ES')}
+            // Requisito 2: En la última página (Pág. 8) reservamos espacio para el QR de corte
+            if (isLastPage) {
+              const cutoffBlock = document.createElement('div');
+              cutoffBlock.className = 'cutoff-qr-block';
+              cutoffBlock.innerHTML = `
+                <div class="cutoff-bar">[ ... TEXTO CORTADO POR LÍMITE DE PÁGINA IMPRESA ... ]</div>
+                <div class="cutoff-flex">
+                  ${art.qrDataUrl ? `<img src="${art.qrDataUrl}" class="cutoff-qr-img" alt="QR" />` : ''}
+                  <div class="cutoff-meta">
+                    <span class="cutoff-title">ESCANEA PARA LEER TEXTO COMPLETO Y FUENTE:</span>
+                    <span class="cutoff-url">${art.effectiveUrl}</span>
+                  </div>
                 </div>
-                <!-- Titular Secundario -->
-                <h3 class="text-xs sm:text-[10.5pt] font-black font-serif uppercase tracking-tight leading-tight mb-1 text-black">
-                  {art.title}
-                </h3>
-                <!-- Extracto -->
-                <p class="font-serif text-[8.25pt] leading-snug text-gray-800 italic m-0 line-clamp-3">
-                  "{art.excerpt || (art.content.substring(0, 150) + '...')}"
-                </p>
-                <div class="font-mono text-[7.5pt] font-bold text-black mt-1">
-                  [ Continúa en interior ➔ ]
-                </div>
-              </article>
-            ))}
-          </div>
-        </aside>
-      </div>
+              `;
 
-      <!-- Pie de Portada -->
-      <div class="fanzine-portada-footer border-t-2 border-black pt-1.5 mt-3 flex justify-between items-center font-mono text-[7.5pt] uppercase font-bold">
-        <span>LA PARTE ARRENDATARIA — EDICIÓN IMPRESA POPULAR</span>
-        <span>CONTINÚA EN PÁGINAS INTERIORES ➔</span>
-      </div>
-    </div>
+              currentSlot.appendChild(el);
+              currentSlot.appendChild(cutoffBlock);
 
-    <!-- ======================================================== -->
-    <!-- HOJAS INTERIORES: ARTÍCULOS COMPLETOS A 3 COLS CONTINUAS -->
-    <!-- ======================================================== -->
-    <div class="sheet-container fanzine-interior-page">
-      <!-- Encabezado de Página Interior / Folio de Prensa -->
-      <div class="fanzine-inner-page-header border-b-2 border-black pb-1 mb-3 flex justify-between items-center font-mono text-[8pt] uppercase font-bold">
-        <span>LA PARTE ARRENDATARIA — PÁGINAS INTERIORES</span>
-        <span>ÓRGANO DE CONTRAINFORMACIÓN EDITORIAL</span>
-        <span>Nº 01 • EDICIÓN POPULAR</span>
-      </div>
+              if (currentSlot.scrollWidth > currentSlot.clientWidth) {
+                // Desborda: quitar ambos y colocar el cutoffBlock final
+                currentSlot.removeChild(cutoffBlock);
+                currentSlot.removeChild(el);
 
-      <!-- Flujo Editorial Continuo a 3 Columnas CSS -->
-      <main class="fanzine-editorial-flow">
-        {interiorArticles.map((article) => (
-          <ArticleCard
-            article={article}
-            isPrintView={true}
-            qrDataUrl={qrMap.get(article.id) || ''}
-          />
-        ))}
-      </main>
-    </div>
+                // Si es un párrafo <p>, intentar encajar tantas palabras como quepan antes del cutoffBlock
+                if (el.tagName === 'P') {
+                  const words = (el.textContent || '').split(' ');
+                  if (words.length > 5) {
+                    const partialP = document.createElement('p');
+                    currentSlot.appendChild(partialP);
+                    currentSlot.appendChild(cutoffBlock);
+
+                    let low = 1, high = words.length, best = 0;
+                    while (low <= high) {
+                      const mid = Math.floor((low + high) / 2);
+                      partialP.textContent = words.slice(0, mid).join(' ') + ' [...]';
+                      if (currentSlot.scrollWidth <= currentSlot.clientWidth) {
+                        best = mid;
+                        low = mid + 1;
+                      } else {
+                        high = mid - 1;
+                      }
+                    }
+
+                    if (best > 0) {
+                      partialP.textContent = words.slice(0, best).join(' ') + ' [...]';
+                    } else {
+                      currentSlot.removeChild(partialP);
+                    }
+                  }
+                }
+
+                if (!currentSlot.contains(cutoffBlock)) {
+                  currentSlot.appendChild(cutoffBlock);
+                }
+
+                isBookletFinished = true;
+                break;
+              } else {
+                // Cabe con el cutoffBlock: retirar cutoffBlock para continuar con siguientes elementos
+                currentSlot.removeChild(cutoffBlock);
+              }
+            } else {
+              // En páginas 2 a 7: inserción normal. Si desborda, pasar el elemento a la siguiente página
+              currentSlot.appendChild(el);
+
+              if (currentSlot.scrollWidth > currentSlot.clientWidth) {
+                currentSlot.removeChild(el);
+                currentSlotIdx++;
+                if (currentSlotIdx < pageSlots.length) {
+                  pageSlots[currentSlotIdx].appendChild(el);
+                } else {
+                  isBookletFinished = true;
+                  break;
+                }
+              }
+            }
+          }
+
+          // Si el artículo terminó normalmente sin cortarse, añadir su QR normal
+          if (!isBookletFinished && qrNormalBlock && currentSlotIdx < pageSlots.length) {
+            const currentSlot = pageSlots[currentSlotIdx];
+            currentSlot.appendChild(qrNormalBlock);
+            if (currentSlot.scrollWidth > currentSlot.clientWidth) {
+              currentSlot.removeChild(qrNormalBlock);
+              currentSlotIdx++;
+              if (currentSlotIdx < pageSlots.length) {
+                pageSlots[currentSlotIdx].appendChild(qrNormalBlock);
+              }
+            }
+          }
+        }
+
+        // Requisito 3: Si el usuario seleccionó un contenido muy corto, las páginas restantes quedan en blanco
+        for (let i = currentSlotIdx + 1; i < pageSlots.length; i++) {
+          const emptySlot = pageSlots[i];
+          if (!emptySlot.hasChildNodes() || emptySlot.children.length === 0) {
+            const watermark = document.createElement('div');
+            watermark.className = 'page-empty-watermark';
+            watermark.textContent = '— PÁGINA EN BLANCO —';
+            emptySlot.appendChild(watermark);
+          }
+        }
+      }
+
+      // Ejecutar paginación cuando todas las imágenes y fuentes estén completamente listas
+      async function initPagination() {
+        if (document.fonts) await document.fonts.ready;
+        await paginateBooklet();
+      }
+
+      if (document.readyState === 'complete') {
+        initPagination();
+      } else {
+        window.addEventListener('load', initPagination);
+      }
+    </script>
   </body>
 </html>

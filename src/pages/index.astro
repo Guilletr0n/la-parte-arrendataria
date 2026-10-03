@@ -6,7 +6,7 @@ import { getArticles } from '../lib/db';
 
 export const prerender = false;
 
-const articles = await getArticles({ status: 'published' });
+const articles = await getArticles({ status: 'published', sortBy: 'blended' });
 ---
 
 <Layout title="La Parte Arrendataria — Periódico de Guerrilla Inquilina">
@@ -14,7 +14,7 @@ const articles = await getArticles({ status: 'published' });
   <Header />
 
   <!-- Manifiesto Rápido Guerrilla -->
-  <div class="border-2 border-black bg-white p-3 mb-8 shadow-[4px_4px_0px_#000] text-xs font-mono">
+  <div class="border-2 border-black bg-white p-3 mb-6 shadow-[4px_4px_0px_#000] text-xs font-mono">
     <div class="flex items-center justify-between mb-1">
       <span class="font-bold uppercase tracking-wider text-red-700">★ AVISO A LA COMUNIDAD ARRENDATARIA</span>
       <span class="bg-black text-white px-1.5 py-0.5 text-[10px]">EDICIÓN DIGITAL</span>
@@ -24,7 +24,20 @@ const articles = await getArticles({ status: 'published' });
     </p>
   </div>
 
-  <!-- Feed Cronológico de Artículos -->
+  <!-- Barra de Sindicación Popular y Criterio de Ordenación -->
+  <div class="flex items-center justify-between border-b-2 border-black pb-2 mb-6 font-mono text-xs">
+    <div class="flex items-center gap-2">
+      <span class="bg-black text-white font-bold px-1.5 py-0.5 text-[10px]">SINDICACIÓN</span>
+      <span class="font-bold text-black uppercase tracking-tight">Artículos Sindicados</span>
+    </div>
+    <div class="text-[11px] text-gray-600 flex items-center gap-1.5">
+      <span class="text-black font-bold">✊🏼 Puño en alto</span>
+      <span class="text-gray-400">|</span>
+      <span>Ordenados por votos y fecha</span>
+    </div>
+  </div>
+
+  <!-- Feed de Artículos Sindicados -->
   <section class="space-y-2">
     {articles.length === 0 ? (
       <div class="border-2 border-dashed border-black p-8 text-center font-mono">

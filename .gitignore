@@ -6,3 +6,5 @@ dist/
 .env.production
 .DS_Store
 *.log
+service-account.json
+service-account*.json

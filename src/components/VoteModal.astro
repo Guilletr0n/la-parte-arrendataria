@@ -1,0 +1,92 @@
+---
+// VoteModal.astro: Brutalist modal notifying unregistered users when they hit the 3-vote limit
+---
+
+<dialog
+  id="vote-limit-modal"
+  class="fixed inset-0 m-auto p-0 border-4 border-black bg-yellow-300 shadow-[8px_8px_0px_#000] max-w-lg w-[92%] backdrop:bg-black/75 z-50 overflow-hidden"
+>
+  <div class="p-6 font-mono text-black">
+    <!-- Header with Fist Icon and Warning -->
+    <div class="flex items-center justify-between border-b-2 border-black pb-3 mb-4">
+      <div class="flex items-center gap-2">
+        <span class="text-2xl select-none">✊🏼</span>
+        <span class="font-black text-sm uppercase tracking-wider bg-black text-white px-2 py-0.5">
+          AVISO DEL SINDICATO
+        </span>
+      </div>
+      <button
+        type="button"
+        id="modal-close-x"
+        class="font-black text-lg hover:bg-black hover:text-white px-2 py-0.5 border border-black transition-colors"
+        aria-label="Cerrar modal"
+      >
+        ✕
+      </button>
+    </div>
+
+    <!-- Modal Content -->
+    <h3 class="font-serif text-xl sm:text-2xl font-black uppercase mb-3 leading-tight text-black">
+      Has alcanzado tus 3 apoyos como visitante anónima
+    </h3>
+
+    <div class="space-y-3 text-xs sm:text-sm text-gray-900 bg-white border-2 border-black p-4 mb-6 shadow-[3px_3px_0px_#000]">
+      <p class="leading-relaxed">
+        Cada apoyo con el <strong>puño en alto ✊🏼</strong> eleva la visibilidad del artículo en la portada digital e impulsa su inclusión directa en las <strong>páginas del fanzine impreso</strong>.
+      </p>
+      <p class="leading-relaxed border-l-4 border-red-700 pl-3 italic text-gray-800">
+        <strong>Principio democrático:</strong> 1 persona = 1 voto por artículo. Para evitar manipulaciones de bots sin identificación, las visitas anónimas sólo pueden emitir <strong>hasta 3 votos en total</strong>.
+      </p>
+      <p class="leading-relaxed font-bold text-black">
+        Con una cuenta identificada puedes apoyar democráticamente todos los artículos del catálogo (1 voto por artículo) o postularte para redactar y subir artículos al fanzine.
+      </p>
+    </div>
+
+    <!-- Modal Action Buttons -->
+    <div class="flex flex-col sm:flex-row gap-2 justify-end items-stretch sm:items-center pt-2">
+      <button
+        type="button"
+        id="modal-close-btn"
+        class="brutal-btn bg-white hover:bg-gray-100 text-xs text-center"
+      >
+        Volver a la lectura
+      </button>
+      <a
+        href="/registro"
+        class="brutal-btn brutal-btn-primary text-xs text-center font-bold"
+      >
+        ✊🏼 Postularse como Editora →
+      </a>
+      <a
+        href="/admin/login"
+        class="brutal-btn bg-black text-white hover:bg-gray-800 text-xs text-center font-bold"
+      >
+        Iniciar Sesión
+      </a>
+    </div>
+  </div>
+</dialog>
+
+<script>
+  function setupVoteModal() {
+    const modal = document.getElementById('vote-limit-modal') as HTMLDialogElement | null;
+    const closeBtn = document.getElementById('modal-close-btn');
+    const closeX = document.getElementById('modal-close-x');
+
+    const closeModal = () => modal?.close();
+
+    closeBtn?.addEventListener('click', closeModal);
+    closeX?.addEventListener('click', closeModal);
+
+    // Close when clicking on dialog backdrop
+    modal?.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.close();
+      }
+    });
+  }
+
+  // Initialize on load and on astro page swaps
+  setupVoteModal();
+  document.addEventListener('astro:page-load', setupVoteModal);
+</script>

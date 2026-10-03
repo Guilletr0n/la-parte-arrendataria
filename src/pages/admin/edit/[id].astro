@@ -6,8 +6,8 @@ import { getArticleById } from '../../../lib/db';
 export const prerender = false;
 
 const user = await getCurrentUser(Astro.cookies);
-if (!user) {
-  return Astro.redirect('/admin/login');
+if (!user || user.role === 'reader') {
+  return Astro.redirect('/admin');
 }
 
 const { id } = Astro.params;

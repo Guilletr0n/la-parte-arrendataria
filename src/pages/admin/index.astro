@@ -242,7 +242,7 @@ allArticles.forEach(a => {
                     <!-- Multimedia -->
                     <td class="p-2 text-[10px] whitespace-nowrap">
                       <div>📷 {art.photoUrl ? '1 Foto asignada' : 'Sin foto'}</div>
-                      <div>🎙️ {art.speakPipeAudioUrl ? 'Audio 2 min' : 'Sin audio'}</div>
+                      <div>🎙️ {(art.audioUrl || art.speakPipeAudioUrl) ? 'Nota de voz' : 'Sin audio'}</div>
                     </td>
 
                     <!-- Fanzine Print indicator -->

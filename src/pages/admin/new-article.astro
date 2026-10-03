@@ -1,5 +1,6 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import VoiceNoteRecorder from '../../components/VoiceNoteRecorder.astro';
 import { getCurrentUser, canPublish } from '../../lib/auth';
 
 export const prerender = false;
@@ -91,32 +92,8 @@ const isAdmin = canPublish(user);
         </p>
       </div>
 
-      <!-- 3. Audio Voice-Note (SpeakPipe API - Máx 2 Min) -->
-      <div class="border-2 border-black p-4 bg-gray-50">
-        <div class="flex items-center justify-between mb-2">
-          <label class="font-bold uppercase text-black" for="speakPipeAudioUrl">
-            3. Nota de Voz de Redacción (SpeakPipe API • Máx. 2 Minutos)
-          </label>
-          <a
-            href="https://www.speakpipe.com/voice-recorder"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-red-700 underline font-bold text-[10px] hover:text-black"
-          >
-            Abrir Grabador SpeakPipe ↗
-          </a>
-        </div>
-        <input
-          type="url"
-          id="speakPipeAudioUrl"
-          name="speakPipeAudioUrl"
-          placeholder="https://www.speakpipe.com/voice-recorder/embed/... o enlace de audio MP3"
-          class="w-full border-2 border-black p-2 bg-white mb-1"
-        />
-        <p class="text-[10px] text-gray-500">
-          Integra el widget o audio de SpeakPipe para que la versión digital cuente con la voz directa del redactor/activista.
-        </p>
-      </div>
+      <!-- 3. Nota de voz (Máx. 2 min.) -->
+      <VoiceNoteRecorder />
 
       <!-- 4. Cuerpo en Markdown (Escribir o Subir Archivo) -->
       <div class="border-2 border-black p-4 bg-white">
@@ -335,13 +312,27 @@ const isAdmin = canPublish(user);
       const alertBox = document.getElementById('alert-box');
       alertBox.classList.add('hidden');
 
+      let audioUrl = '';
+      try {
+        if (typeof window.getOrUploadAudioUrl === 'function') {
+          audioUrl = await window.getOrUploadAudioUrl();
+        } else {
+          audioUrl = document.getElementById('audioUrl')?.value || '';
+        }
+      } catch (uploadErr) {
+        alertBox.className = 'mb-4 p-3 border-2 border-red-700 bg-red-100 text-red-900 font-mono text-xs font-bold';
+        alertBox.innerText = 'Error al subir la nota de voz: ' + uploadErr.message;
+        alertBox.classList.remove('hidden');
+        return;
+      }
+
       const payload = {
         title: document.getElementById('title').value,
         excerpt: document.getElementById('excerpt').value,
         content: document.getElementById('content').value,
         photoUrl: document.getElementById('photoUrl').value,
         photoCaption: document.getElementById('photoCaption').value,
-        speakPipeAudioUrl: document.getElementById('speakPipeAudioUrl').value,
+        audioUrl: audioUrl,
         sourceUrl: document.getElementById('sourceUrl').value,
         status: status,
       };

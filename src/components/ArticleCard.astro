@@ -83,26 +83,17 @@ const articleUrl = `/articulo/${article.slug}`;
         </figure>
       )}
 
-      <!-- SpeakPipe Voice Note Player (Web pública) -->
-      {!isPrintView && article.speakPipeAudioUrl && (
+      <!-- Voice Note Player (Web pública) -->
+      {!isPrintView && (article.audioUrl || article.speakPipeAudioUrl) && (
         <div class="my-4 p-3 border-2 border-black bg-white shadow-[3px_3px_0px_#000]">
           <div class="flex items-center gap-2 font-mono text-xs uppercase font-bold mb-2">
             <span class="inline-block w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse"></span>
-            <span>Nota de Voz de Redacción (SpeakPipe • Máx 2 min)</span>
+            <span>Nota de voz (Máx 2 min.)</span>
           </div>
-          {article.speakPipeAudioUrl.includes('embed') ? (
-            <iframe
-              src={article.speakPipeAudioUrl}
-              class="w-full h-16 border-0"
-              allow="microphone"
-              title="Audio SpeakPipe"
-            ></iframe>
-          ) : (
-            <audio controls class="w-full h-10 accent-black">
-              <source src={article.speakPipeAudioUrl} type="audio/mpeg" />
-              Tu navegador no soporta el reproductor de audio.
-            </audio>
-          )}
+          <audio controls class="w-full h-10 accent-black">
+            <source src={article.audioUrl || article.speakPipeAudioUrl} />
+            Tu navegador no soporta el reproductor de audio.
+          </audio>
         </div>
       )}
 

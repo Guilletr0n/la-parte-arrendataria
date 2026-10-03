@@ -46,7 +46,13 @@ export const PUT: APIRoute = async ({ params, request, cookies }) => {
     if (data.content !== undefined) updates.content = data.content;
     if (data.photoUrl !== undefined) updates.photoUrl = data.photoUrl;
     if (data.photoCaption !== undefined) updates.photoCaption = data.photoCaption;
-    if (data.speakPipeAudioUrl !== undefined) updates.speakPipeAudioUrl = data.speakPipeAudioUrl;
+    if (data.audioUrl !== undefined) {
+      updates.audioUrl = data.audioUrl;
+      updates.speakPipeAudioUrl = data.audioUrl;
+    } else if (data.speakPipeAudioUrl !== undefined) {
+      updates.audioUrl = data.speakPipeAudioUrl;
+      updates.speakPipeAudioUrl = data.speakPipeAudioUrl;
+    }
     if (data.sourceUrl !== undefined) updates.sourceUrl = data.sourceUrl;
 
     if (data.status !== undefined) {

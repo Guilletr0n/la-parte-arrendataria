@@ -1,5 +1,6 @@
 ---
 import Layout from '../../../layouts/Layout.astro';
+import VoiceNoteRecorder from '../../../components/VoiceNoteRecorder.astro';
 import { getCurrentUser, canPublish, canEditArticle } from '../../../lib/auth';
 import { getArticleById } from '../../../lib/db';
 
@@ -120,30 +121,8 @@ const defaultExcerpt = article.excerpt || (
         />
       </div>
 
-      <!-- 3. Audio Voice-Note SpeakPipe -->
-      <div class="border-2 border-black p-4 bg-gray-50">
-        <div class="flex items-center justify-between mb-2">
-          <label class="font-bold uppercase text-black" for="speakPipeAudioUrl">
-            3. Nota de Voz de Redacción (SpeakPipe • Máx. 2 Minutos)
-          </label>
-          <a
-            href="https://www.speakpipe.com/voice-recorder"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-red-700 underline font-bold text-[10px]"
-          >
-            Abrir SpeakPipe ↗
-          </a>
-        </div>
-        <input
-          type="url"
-          id="speakPipeAudioUrl"
-          name="speakPipeAudioUrl"
-          value={article.speakPipeAudioUrl || ''}
-          placeholder="https://www.speakpipe.com/..."
-          class="w-full border-2 border-black p-2 bg-white mb-1"
-        />
-      </div>
+      <!-- 3. Nota de voz (Máx. 2 min.) -->
+      <VoiceNoteRecorder initialAudioUrl={article.audioUrl || article.speakPipeAudioUrl || ''} />
 
       <!-- 4. Cuerpo en Markdown (Escribir o Cargar Archivo) -->
       <div class="border-2 border-black p-4 bg-white">
@@ -344,13 +323,27 @@ const defaultExcerpt = article.excerpt || (
 
       alertBox.classList.add('hidden');
 
+      let audioUrl = '';
+      try {
+        if (typeof window.getOrUploadAudioUrl === 'function') {
+          audioUrl = await window.getOrUploadAudioUrl();
+        } else {
+          audioUrl = document.getElementById('audioUrl')?.value || '';
+        }
+      } catch (uploadErr) {
+        alertBox.className = 'mb-4 p-3 border-2 border-red-700 bg-red-100 text-red-900 font-mono text-xs font-bold';
+        alertBox.innerText = 'Error al subir la nota de voz: ' + uploadErr.message;
+        alertBox.classList.remove('hidden');
+        return;
+      }
+
       const payload = {
         title: document.getElementById('title').value,
         excerpt: document.getElementById('excerpt').value,
         content: document.getElementById('content').value,
         photoUrl: document.getElementById('photoUrl').value,
         photoCaption: document.getElementById('photoCaption').value,
-        speakPipeAudioUrl: document.getElementById('speakPipeAudioUrl').value,
+        audioUrl: audioUrl,
         sourceUrl: document.getElementById('sourceUrl').value,
         status: status,
       };

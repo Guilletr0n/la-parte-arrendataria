@@ -31,7 +31,8 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
   try {
     const data = await request.json();
-    const { title, excerpt, content, photoUrl, photoCaption, speakPipeAudioUrl, sourceUrl, status } = data;
+    const { title, excerpt, content, photoUrl, photoCaption, audioUrl, speakPipeAudioUrl, sourceUrl, status } = data;
+    const finalAudioUrl = audioUrl || speakPipeAudioUrl || '';
 
     if (!title || !content) {
       return new Response(JSON.stringify({ error: 'Título y contenido son obligatorios.' }), {
@@ -70,7 +71,8 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       content,
       photoUrl: photoUrl || '',
       photoCaption: photoCaption || '',
-      speakPipeAudioUrl: speakPipeAudioUrl || '',
+      audioUrl: finalAudioUrl,
+      speakPipeAudioUrl: finalAudioUrl,
       sourceUrl: sourceUrl || '',
       status: finalStatus,
     });

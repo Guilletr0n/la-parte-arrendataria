@@ -25,7 +25,8 @@ export interface Article {
   content: string; // Markdown
   photoUrl: string; // Restricción de 1 foto
   photoCaption?: string;
-  speakPipeAudioUrl?: string; // Voice-note SpeakPipe (máx. 2 min)
+  audioUrl?: string; // Nota de voz (máx. 2 min.)
+  speakPipeAudioUrl?: string; // Compatibilidad heredada
   sourceUrl?: string; // Enlace a fuente original (usado para QR en PDF)
   status: ArticleStatus;
   createdAt: string;

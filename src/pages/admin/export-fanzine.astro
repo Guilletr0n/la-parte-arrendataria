@@ -10,7 +10,11 @@ if (!user || !canExportPdf(user)) {
   return Astro.redirect('/admin/login');
 }
 
-const publishedArticles = await getArticles({ status: 'published' });
+// Excluir notas de audio puras para que no se mezclen con los artículos de prensa del fanzine
+const allPublished = await getArticles({ status: 'published' });
+const publishedArticles = allPublished.filter(
+  art => !art.isAudioOnly && !art.tags?.includes('audio')
+);
 ---
 
 <Layout title="Confección y Exportación de Fanzine | La Parte Arrendataria" maxWidth="max-w-[850px]">

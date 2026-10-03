@@ -20,9 +20,14 @@ const formattedDate = new Date(article.createdAt).toLocaleDateString('es-ES', {
   day: 'numeric',
 });
 const articleUrl = `/articulo/${article.slug}`;
+const isAudioArticle = article.isAudioOnly || (Array.isArray(article.tags) && article.tags.includes('audio'));
+const audioSrc = article.audioUrl || article.speakPipeAudioUrl;
 ---
 
-<article class={`editorial-article mb-10 pb-8 border-b-2 border-black last:border-b-0 ${isPrintView ? 'fanzine-article-block' : ''}`}>
+<article
+  class={`editorial-article mb-10 pb-8 border-b-2 border-black last:border-b-0 ${isPrintView ? 'fanzine-article-block' : ''}`}
+  data-is-audio={isAudioArticle ? 'true' : 'false'}
+>
   <!-- Header del artículo (agrupado para evitar orfandad en columnas de fanzine) -->
   <div class="fanzine-article-header">
     <!-- Meta header of article: Autor y Fecha -->
@@ -31,6 +36,11 @@ const articleUrl = `/articulo/${article.slug}`;
         <span class="bg-black text-white font-bold px-1.5 py-0.5 text-[10px]">
           {article.authorRole.toUpperCase()}
         </span>
+        {isAudioArticle && (
+          <span class="bg-red-700 text-white font-bold px-1.5 py-0.5 text-[10px] uppercase flex items-center gap-1">
+            🎙️ AUDIO
+          </span>
+        )}
         <span class="font-bold text-black">{article.author}</span>
       </div>
       <span>{formattedDate}</span>
@@ -50,12 +60,23 @@ const articleUrl = `/articulo/${article.slug}`;
 
   {isExcerptOnly ? (
     <div class="space-y-3">
+      {isAudioArticle && audioSrc && (
+        <div class="my-2 p-2.5 bg-yellow-50 border-2 border-black shadow-[2px_2px_0px_#000]">
+          <div class="flex items-center gap-1.5 font-mono text-[11px] font-bold text-red-700 uppercase mb-1.5">
+            <span class="inline-block w-2 h-2 rounded-full bg-red-600 animate-pulse"></span>
+            <span>Nota de voz (Máx. 2 min.)</span>
+          </div>
+          <audio controls preload="none" class="w-full h-9 accent-black">
+            <source src={audioSrc} />
+          </audio>
+        </div>
+      )}
       <p class="font-serif text-sm sm:text-base text-gray-900 leading-relaxed italic border-l-2 border-black pl-3 py-1 bg-white/70">
         {article.excerpt || (article.content.length > 200 ? article.content.substring(0, 200) + '...' : article.content)}
       </p>
       <div class="pt-2 flex flex-wrap items-center justify-between gap-3">
         <a href={articleUrl} class="brutal-btn text-xs font-bold">
-          Leer artículo completo →
+          {isAudioArticle ? 'Ver nota y detalles →' : 'Leer artículo completo →'}
         </a>
         {!isPrintView && (
           <VoteButton articleId={article.id} initialVotes={article.votes || 0} />

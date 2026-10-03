@@ -199,11 +199,17 @@ const audioArticles = allArticles.filter(article => {
   </section>
 
   <!-- Banner Informativo Inferior -->
-  <div class="my-8 border-2 border-black p-4 bg-white shadow-[4px_4px_0px_#000] font-mono text-xs text-center">
-    <p class="font-bold uppercase text-red-700 mb-1">🎙️ PARTICIPACIÓN Y NOTAS DE VOZ POPULARES</p>
-    <p class="text-gray-700 m-0">
-      Las redactoras y asambleas sindicales pueden grabar notas de voz directamente desde el editor de artículos al enviar sus crónicas.
+  <div class="my-8 border-2 border-black rounded-xl p-4 bg-yellow-100 shadow-[4px_4px_0px_#000] font-mono text-xs text-center space-y-2">
+    <p class="font-bold uppercase text-red-700 m-0">🎙️ PARTICIPACIÓN Y NOTAS DE VOZ POPULARES</p>
+    <p class="text-gray-800 m-0">
+      Las redactoras y asambleas sindicales pueden grabar notas de voz directamente desde su móvil o desde el editor de artículos.
     </p>
+    <div class="pt-1">
+      <a href="/admin/grabar-audio" class="brutal-btn bg-red-600 hover:bg-black text-white text-xs font-bold py-2 px-4 rounded-lg inline-flex items-center gap-1.5 shadow-[2px_2px_0px_#000]">
+        <span>🎙️</span>
+        <span>Abrir Grabadora Móvil</span>
+      </a>
+    </div>
   </div>
 </Layout>
 

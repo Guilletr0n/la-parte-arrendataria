@@ -54,6 +54,8 @@ export const PUT: APIRoute = async ({ params, request, cookies }) => {
       updates.speakPipeAudioUrl = data.speakPipeAudioUrl;
     }
     if (data.sourceUrl !== undefined) updates.sourceUrl = data.sourceUrl;
+    if (data.isAudioOnly !== undefined) updates.isAudioOnly = !!data.isAudioOnly;
+    if (data.tags !== undefined) updates.tags = data.tags;
 
     if (data.status !== undefined) {
       if (data.status === 'published' && !canPublish(user)) {

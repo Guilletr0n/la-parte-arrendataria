@@ -112,6 +112,9 @@ const paginatedArticles = visibleArticles.slice((currentPage - 1) * PAGE_SIZE, c
         <span class="bg-black text-white px-2 py-0.5 text-xs font-bold">
           {totalArticles} {totalArticles === 1 ? 'artículo' : 'artículos'}
         </span>
+        <a href="/admin/grabar-audio" class="brutal-btn bg-red-600 text-white hover:bg-black text-xs font-bold py-1 px-2.5 rounded-lg flex items-center gap-1 shadow-[2px_2px_0px_#000]">
+          🎙️ Grabar Audio
+        </a>
         <a href="/admin/new-article" class="brutal-btn brutal-btn-primary text-xs font-bold py-1 px-3">
           + Redactar Nuevo
         </a>

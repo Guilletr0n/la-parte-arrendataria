@@ -31,14 +31,31 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
   try {
     const data = await request.json();
-    const { title, excerpt, content, photoUrl, photoCaption, audioUrl, speakPipeAudioUrl, sourceUrl, status } = data;
+    const { title, excerpt, content, photoUrl, photoCaption, audioUrl, speakPipeAudioUrl, sourceUrl, status, isAudioOnly, tags } = data;
     const finalAudioUrl = audioUrl || speakPipeAudioUrl || '';
+    const audioOnly = !!isAudioOnly || (Array.isArray(tags) && tags.includes('audio'));
 
-    if (!title || !content) {
-      return new Response(JSON.stringify({ error: 'Título y contenido son obligatorios.' }), {
+    if (!title) {
+      return new Response(JSON.stringify({ error: 'El título es obligatorio.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
+    }
+
+    if (audioOnly) {
+      if (!finalAudioUrl) {
+        return new Response(JSON.stringify({ error: 'Una nota de audio requiere haber grabado un clip de voz.' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    } else {
+      if (!content) {
+        return new Response(JSON.stringify({ error: 'Título y contenido son obligatorios para artículos de prensa.' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     // RBAC: Editors can only create drafts. Only Admins can set status to 'published'.
@@ -61,20 +78,24 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       .replace(/[\s_-]+/g, '-')
       .replace(/^-+|-+$/g, '');
 
+    const finalTags = Array.isArray(tags) ? tags : (audioOnly ? ['audio'] : []);
+
     const newArticle = await createArticle({
       title,
       slug: slug || 'articulo-' + Date.now(),
       author: user.displayName || user.email.split('@')[0],
       authorRole: user.role,
       authorUid: user.uid,
-      excerpt: excerpt || '',
-      content,
+      excerpt: excerpt || (audioOnly ? 'Nota de voz de crónica y contrainformación inquilina (máx. 2 min).' : ''),
+      content: content || (audioOnly ? 'Nota de voz de 2 minutos grabada para La Parte Arrendataria.' : ''),
       photoUrl: photoUrl || '',
       photoCaption: photoCaption || '',
       audioUrl: finalAudioUrl,
       speakPipeAudioUrl: finalAudioUrl,
       sourceUrl: sourceUrl || '',
       status: finalStatus,
+      isAudioOnly: audioOnly,
+      tags: finalTags,
     });
 
     return new Response(JSON.stringify({ success: true, article: newArticle }), {

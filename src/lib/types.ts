@@ -36,6 +36,8 @@ export interface Article {
   fanzineCategory?: FanzineCategory;
   includeInInterior?: boolean;
   votes?: number;
+  isAudioOnly?: boolean; // Nota de audio pura (creada desde interfaz móvil)
+  tags?: string[]; // Etiquetas temáticas (ej: ['audio'])
 }
 
 export interface FanzineIssue {

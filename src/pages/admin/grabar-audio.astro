@@ -1,0 +1,638 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getCurrentUser, canPublish, canCreateArticle } from '../../lib/auth';
+
+export const prerender = false;
+
+const user = await getCurrentUser(Astro.cookies);
+if (!user || !canCreateArticle(user)) {
+  return Astro.redirect('/admin/login');
+}
+
+const isAdmin = canPublish(user);
+---
+
+<Layout
+  title="Grabar Nota de Audio Móvil | La Parte Arrendataria"
+  description="Grabadora táctil móvil para crónicas y notas de voz populares de 2 minutos."
+  maxWidth="max-w-[640px]"
+>
+  <!-- Barra superior móvil -->
+  <div class="flex items-center justify-between font-mono text-xs mb-4 pb-2 border-b-2 border-black">
+    <a
+      href="/admin"
+      class="font-bold hover:underline flex items-center gap-1 text-black py-1 px-2 border-2 border-black rounded-lg bg-white shadow-[2px_2px_0px_#000] active:translate-y-0.5"
+    >
+      ← Salir
+    </a>
+    <div class="flex items-center gap-1.5 text-right">
+      <span class="w-2 h-2 rounded-full bg-green-600 inline-block animate-pulse"></span>
+      <span class="font-bold text-black uppercase text-[11px] truncate max-w-[140px] sm:max-w-none">
+        {user.displayName}
+      </span>
+      <span class="text-[10px] bg-black text-white px-1.5 py-0.5 rounded">
+        {user.role.toUpperCase()}
+      </span>
+    </div>
+  </div>
+
+  <!-- Contenedor Principal Móvil con Esquinas Redondeadas (Estilo New Brutalism Suavizado) -->
+  <div class="border-[3px] border-black bg-white rounded-2xl p-4 sm:p-6 shadow-[5px_5px_0px_#000] mb-6 font-mono">
+    
+    <!-- Encabezado de la grabadora móvil -->
+    <div class="text-center mb-6 pb-4 border-b-2 border-black/20">
+      <div class="inline-flex items-center gap-2 bg-red-100 text-red-800 border-2 border-red-700 px-3 py-1 rounded-full text-xs font-bold uppercase mb-2 shadow-[2px_2px_0px_#b91c1c]">
+        <span class="w-2.5 h-2.5 rounded-full bg-red-600 animate-ping"></span>
+        <span>Estudio Móvil Inquilino</span>
+      </div>
+      <h1 class="text-xl sm:text-2xl font-black font-serif uppercase tracking-tight text-black m-0">
+        Nueva Nota de Audio
+      </h1>
+      <p class="text-xs text-gray-600 mt-1 m-0">
+        Grabación directa desde tu móvil (máximo 2 minutos). Solo requiere un título y tu voz.
+      </p>
+    </div>
+
+    <!-- Caja de alertas en pantalla -->
+    <div id="mobile-alert-box" class="hidden mb-4 p-3 border-2 border-black rounded-xl text-xs font-bold"></div>
+
+    <form id="mobile-audio-form" onsubmit="event.preventDefault(); openConfirmModal();" class="space-y-5">
+      
+      <!-- 1. TÍTULO DEL ARTÍCULO DE AUDIO -->
+      <div>
+        <label for="audio-title" class="block font-bold uppercase text-xs text-black mb-1.5">
+          1. Título de la crónica o nota de voz <span class="text-red-700">*</span>:
+        </label>
+        <input
+          type="text"
+          id="audio-title"
+          name="title"
+          required
+          maxlength="140"
+          placeholder="Ej: Crónica de la asamblea en Tribulete 7..."
+          class="w-full border-2 border-black rounded-xl p-3 text-base font-serif font-bold bg-[#fafafa] focus:bg-yellow-50 focus:outline-none focus:ring-2 focus:ring-black shadow-[2px_2px_0px_#000] transition-colors"
+        />
+        <div class="flex justify-between items-center mt-1 text-[10px] text-gray-500 font-mono">
+          <span>Aparecerá en el feed y en la playlist pública</span>
+          <span id="title-char-count">0 / 140</span>
+        </div>
+      </div>
+
+      <!-- 2. ZONA DE GRABACIÓN TÁCTIL (CENTRAL) -->
+      <div class="border-2 border-black rounded-2xl bg-yellow-50 p-4 sm:p-6 text-center shadow-[3px_3px_0px_#000] relative overflow-hidden">
+        
+        <input type="hidden" id="audio-url-input" name="audioUrl" value="" />
+
+        <!-- ESTADO INICIAL: BOTÓN GIGANTE PARA TOCAR Y GRABAR -->
+        <div id="state-idle" class="space-y-4">
+          <p class="text-xs font-bold text-gray-700 uppercase">
+            Toca el micrófono para comenzar
+          </p>
+
+          <!-- Botón táctil grande de micrófono redondeado -->
+          <div class="flex justify-center">
+            <button
+              type="button"
+              id="btn-big-record"
+              class="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-red-600 hover:bg-red-700 text-white border-4 border-black shadow-[4px_4px_0px_#000] flex flex-col items-center justify-center gap-1 active:translate-y-1 active:shadow-none transition-all cursor-pointer select-none"
+              aria-label="Iniciar grabación de audio"
+            >
+              <span class="text-3xl sm:text-4xl">🎙️</span>
+              <span class="text-[10px] sm:text-[11px] font-black uppercase tracking-wider">GRABAR</span>
+            </button>
+          </div>
+
+          <p class="text-[11px] text-gray-600 m-0">
+            Límite automático: <strong>2 minutos exactos</strong>
+          </p>
+        </div>
+
+        <!-- ESTADO GRABANDO: ANIMACIÓN Y CUENTA REGRESIVA -->
+        <div id="state-recording" class="hidden space-y-4">
+          <div class="flex items-center justify-center gap-2 text-red-700 font-black text-sm uppercase">
+            <span class="w-3 h-3 rounded-full bg-red-600 animate-ping inline-block"></span>
+            <span>GRABANDO EN DIRECTO...</span>
+          </div>
+
+          <!-- Contador Gigante -->
+          <div class="text-3xl sm:text-4xl font-black text-black font-mono tracking-tight bg-white border-2 border-black py-2 px-4 rounded-xl inline-block shadow-[2px_2px_0px_#000]">
+            <span id="recording-timer">00:00</span> <span class="text-sm text-gray-400">/ 02:00</span>
+          </div>
+
+          <!-- Barra de Progreso Visual -->
+          <div class="w-full bg-gray-200 border-2 border-black h-4 rounded-full overflow-hidden p-0.5">
+            <div id="recording-progress" class="bg-red-600 h-full w-0 rounded-full transition-all duration-300"></div>
+          </div>
+
+          <!-- Botones de Acción de Grabación -->
+          <div class="flex justify-center gap-3 pt-2">
+            <button
+              type="button"
+              id="btn-cancel-rec"
+              class="brutal-btn bg-white hover:bg-gray-100 text-xs font-bold py-2.5 px-4 rounded-xl border-2 border-black cursor-pointer shadow-[2px_2px_0px_#000] active:translate-y-0.5"
+            >
+              ✕ Cancelar
+            </button>
+            <button
+              type="button"
+              id="btn-stop-rec"
+              class="brutal-btn brutal-btn-primary text-xs font-black py-2.5 px-5 rounded-xl border-2 border-black cursor-pointer shadow-[2px_2px_0px_#000] active:translate-y-0.5 flex items-center gap-1.5"
+            >
+              <span>⏹</span>
+              <span>TERMINAR Y REVISAR</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- ESTADO PREESCUCHA: REPRODUCTOR Y CONTROL DE REPETICIÓN -->
+        <div id="state-preview" class="hidden space-y-3 text-left">
+          <div class="flex items-center justify-between pb-1 border-b border-black/20">
+            <span class="text-xs font-black uppercase text-green-800 flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-green-600 inline-block"></span>
+              <span>Audio grabado con éxito</span>
+            </span>
+            <span id="clip-duration-badge" class="text-[11px] font-bold bg-black text-white px-2 py-0.5 rounded">
+              00:00
+            </span>
+          </div>
+
+          <!-- Reproductor de Audio HTML5 -->
+          <div class="bg-white p-2 border-2 border-black rounded-xl shadow-[2px_2px_0px_#000]">
+            <audio id="mobile-audio-player" controls class="w-full h-10 accent-black">
+              Tu navegador no soporta reproducción de audio.
+            </audio>
+          </div>
+
+          <!-- Opciones de repetición o descarte -->
+          <div class="flex items-center justify-between pt-1">
+            <button
+              type="button"
+              id="btn-discard-audio"
+              class="text-red-700 hover:text-black font-bold text-xs underline cursor-pointer py-1"
+            >
+              🗑️ Descartar y empezar de nuevo
+            </button>
+            <button
+              type="button"
+              id="btn-rerecord-audio"
+              class="brutal-btn bg-yellow-200 hover:bg-yellow-300 text-black text-xs font-bold py-1.5 px-3 rounded-lg border-2 border-black cursor-pointer shadow-[2px_2px_0px_#000] active:translate-y-0.5"
+            >
+              🔄 Volver a grabar
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- BOTÓN PRINCIPAL DE GUARDAR / PUBLICAR (TÁCTIL MÓVIL) -->
+      <div class="pt-2">
+        <button
+          type="button"
+          id="btn-open-confirm"
+          disabled
+          onclick="openConfirmModal()"
+          class="w-full brutal-btn brutal-btn-primary py-3.5 px-4 rounded-2xl text-sm font-black tracking-wide uppercase flex items-center justify-center gap-2 border-[3px] border-black shadow-[4px_4px_0px_#000] disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none active:translate-y-1 transition-all cursor-pointer"
+        >
+          <span>🎙️</span>
+          <span>Continuar y Guardar Nota de Audio →</span>
+        </button>
+        <p class="text-[10px] text-gray-500 text-center mt-1.5">
+          * Podrás elegir si publicarla de inmediato o guardarla en borrador en el siguiente paso.
+        </p>
+      </div>
+
+    </form>
+  </div>
+
+  <!-- MODAL DE CONFIRMACIÓN MÓVIL (Con esquinas redondeadas y usabilidad táctil) -->
+  <dialog
+    id="mobile-confirm-modal"
+    closedby="any"
+    aria-labelledby="confirm-modal-title"
+    class="fixed inset-0 m-auto p-0 border-[4px] border-black bg-white rounded-3xl shadow-[8px_8px_0px_#000] max-w-sm sm:max-w-md w-[92%] backdrop:bg-black/75 z-50 overflow-hidden font-mono"
+  >
+    <div class="p-5 sm:p-6 space-y-4">
+      
+      <!-- Cabecera del diálogo -->
+      <div class="flex items-center justify-between pb-3 border-b-2 border-black">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">🎙️</span>
+          <h2 id="confirm-modal-title" class="font-serif text-lg sm:text-xl font-black uppercase text-black m-0">
+            Confirmar Nota de Audio
+          </h2>
+        </div>
+        <button
+          type="button"
+          onclick="closeConfirmModal()"
+          class="w-8 h-8 rounded-full border-2 border-black flex items-center justify-center font-black hover:bg-black hover:text-white transition-colors cursor-pointer text-sm"
+          aria-label="Cerrar modal"
+        >
+          ✕
+        </button>
+      </div>
+
+      <!-- Resumen de la nota que se va a guardar -->
+      <div class="bg-yellow-100 border-2 border-black rounded-xl p-3.5 text-xs space-y-1.5 shadow-[2px_2px_0px_#000]">
+        <div class="text-[10px] font-bold text-gray-600 uppercase">Resumen de la publicación:</div>
+        <div class="font-serif font-bold text-sm text-black leading-snug line-clamp-2" id="modal-summary-title">
+          -
+        </div>
+        <div class="flex items-center gap-2 text-[11px] text-gray-700 pt-1">
+          <span class="bg-black text-white px-1.5 py-0.2 rounded text-[10px] font-bold">ETIQUETA: AUDIO</span>
+          <span id="modal-summary-duration" class="font-bold">-</span>
+        </div>
+      </div>
+
+      <p class="text-xs text-gray-800 leading-normal m-0">
+        ¿Cómo deseas procesar esta nota de voz?
+      </p>
+
+      <!-- Botones de Acción Táctiles para Móvil -->
+      <div class="space-y-2.5 pt-1">
+        
+        <!-- Opción 1: Publicar Inmediatamente (disponible según permisos de admin) -->
+        {isAdmin ? (
+          <button
+            type="button"
+            id="btn-confirm-publish"
+            onclick="executeSaveArticle('published')"
+            class="w-full brutal-btn bg-red-600 hover:bg-red-700 text-white font-black text-xs sm:text-sm py-3 px-4 rounded-xl border-2 border-black shadow-[3px_3px_0px_#000] flex items-center justify-center active:translate-y-0.5 transition-all cursor-pointer"
+          >
+            <span style="font-family: system-ui, sans-serif; margin-right: 8px;">🚀</span>
+            <span>PUBLICAR DIRECTAMENTE EN LA WEB</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled
+            class="w-full brutal-btn bg-gray-200 text-gray-500 font-bold text-xs py-2.5 px-4 rounded-xl border-2 border-gray-400 cursor-not-allowed opacity-75"
+          >
+            <span style="font-family: system-ui, sans-serif; margin-right: 6px;">🚀</span>
+            <span>Publicación oficial reservada a Administración</span>
+          </button>
+        )}
+
+        <!-- Opción 2: Guardar como Borrador (disponible para todos los roles) -->
+        <button
+          type="button"
+          id="btn-confirm-draft"
+          onclick="executeSaveArticle('draft')"
+          class="w-full brutal-btn bg-white hover:bg-yellow-200 text-black font-black text-xs sm:text-sm py-3 px-4 rounded-xl border-2 border-black shadow-[3px_3px_0px_#000] flex items-center justify-center active:translate-y-0.5 transition-all cursor-pointer"
+        >
+          <span style="font-family: system-ui, sans-serif; margin-right: 8px;">💾</span>
+          <span>GUARDAR COMO BORRADOR</span>
+        </button>
+
+        <!-- Opción 3: Cancelar y seguir revisando -->
+        <button
+          type="button"
+          onclick="closeConfirmModal()"
+          class="w-full text-center text-xs text-gray-600 font-bold hover:underline py-1.5 cursor-pointer"
+        >
+          ← Volver y seguir editando
+        </button>
+      </div>
+
+      <!-- Spinner / Indicador de subida -->
+      <div id="modal-upload-loading" class="hidden text-center py-2">
+        <div class="inline-flex items-center gap-2 text-xs font-bold text-red-700 bg-red-50 border border-red-300 py-1.5 px-3 rounded-lg">
+          <span class="w-3 h-3 rounded-full border-2 border-red-700 border-t-transparent animate-spin"></span>
+          <span>Subiendo audio a la nube y guardando...</span>
+        </div>
+      </div>
+
+    </div>
+  </dialog>
+
+</Layout>
+
+<script is:inline>
+  (() => {
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let recordTimerInterval = null;
+    let secondsElapsed = 0;
+    const MAX_SECONDS = 120; // 2 minutos exactos
+    let recordedBlob = null;
+    let activeStream = null;
+
+    // DOM Elements
+    const titleInput = document.getElementById('audio-title');
+    const titleCharCount = document.getElementById('title-char-count');
+    const audioUrlInput = document.getElementById('audio-url-input');
+    const btnBigRecord = document.getElementById('btn-big-record');
+    const btnStopRec = document.getElementById('btn-stop-rec');
+    const btnCancelRec = document.getElementById('btn-cancel-rec');
+    const btnDiscardAudio = document.getElementById('btn-discard-audio');
+    const btnRerecordAudio = document.getElementById('btn-rerecord-audio');
+    const btnOpenConfirm = document.getElementById('btn-open-confirm');
+
+    const stateIdle = document.getElementById('state-idle');
+    const stateRecording = document.getElementById('state-recording');
+    const statePreview = document.getElementById('state-preview');
+    const timerDisplay = document.getElementById('recording-timer');
+    const progressBar = document.getElementById('recording-progress');
+    const audioPlayer = document.getElementById('mobile-audio-player');
+    const durationBadge = document.getElementById('clip-duration-badge');
+    const alertBox = document.getElementById('mobile-alert-box');
+
+    const confirmModal = document.getElementById('mobile-confirm-modal');
+    const modalSummaryTitle = document.getElementById('modal-summary-title');
+    const modalSummaryDuration = document.getElementById('modal-summary-duration');
+    const modalLoading = document.getElementById('modal-upload-loading');
+
+    // Title counter & form validation
+    if (titleInput && titleCharCount) {
+      titleInput.addEventListener('input', () => {
+        titleCharCount.textContent = `${titleInput.value.length} / 140`;
+        checkCanProceed();
+      });
+    }
+
+    function checkCanProceed() {
+      const hasTitle = !!titleInput && titleInput.value.trim().length > 0;
+      const hasAudio = !!recordedBlob || (!!audioUrlInput && audioUrlInput.value.length > 0);
+      if (btnOpenConfirm) {
+        btnOpenConfirm.disabled = !(hasTitle && hasAudio);
+      }
+    }
+
+    function showAlert(msg, isError = true) {
+      if (alertBox) {
+        alertBox.className = isError
+          ? 'mb-4 p-3 border-2 border-red-700 bg-red-100 text-red-900 rounded-xl text-xs font-bold'
+          : 'mb-4 p-3 border-2 border-green-700 bg-green-100 text-green-900 rounded-xl text-xs font-bold';
+        alertBox.textContent = msg;
+        alertBox.classList.remove('hidden');
+      }
+    }
+
+    function clearAlert() {
+      if (alertBox) {
+        alertBox.textContent = '';
+        alertBox.classList.add('hidden');
+      }
+    }
+
+    function formatTime(totalSec) {
+      const m = Math.floor(totalSec / 60).toString().padStart(2, '0');
+      const s = (totalSec % 60).toString().padStart(2, '0');
+      return `${m}:${s}`;
+    }
+
+    function updateTimer() {
+      if (timerDisplay) {
+        timerDisplay.textContent = formatTime(secondsElapsed);
+      }
+      if (progressBar) {
+        const pct = Math.min(100, (secondsElapsed / MAX_SECONDS) * 100);
+        progressBar.style.width = `${pct}%`;
+      }
+    }
+
+    async function startRecording() {
+      clearAlert();
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showAlert('Tu navegador o dispositivo no soporta grabación de micrófono (se requiere HTTPS o localhost).');
+        return;
+      }
+
+      try {
+        activeStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (err) {
+        console.error('Error accediendo al micrófono:', err);
+        showAlert('No se pudo acceder al micrófono. Por favor, activa los permisos de micrófono en los ajustes de tu navegador móvil.');
+        return;
+      }
+
+      // Detect supported mime type
+      let mimeType = 'audio/webm;codecs=opus';
+      if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'audio/webm';
+      if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'audio/mp4';
+      if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = '';
+
+      try {
+        mediaRecorder = mimeType ? new MediaRecorder(activeStream, { mimeType }) : new MediaRecorder(activeStream);
+      } catch (e) {
+        mediaRecorder = new MediaRecorder(activeStream);
+      }
+
+      audioChunks = [];
+      secondsElapsed = 0;
+      updateTimer();
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          audioChunks.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        clearInterval(recordTimerInterval);
+        if (activeStream) {
+          activeStream.getTracks().forEach(t => t.stop());
+          activeStream = null;
+        }
+
+        if (audioChunks.length > 0) {
+          const finalMime = mediaRecorder.mimeType || 'audio/webm';
+          recordedBlob = new Blob(audioChunks, { type: finalMime });
+          const blobUrl = URL.createObjectURL(recordedBlob);
+          if (audioPlayer) {
+            audioPlayer.src = blobUrl;
+            audioPlayer.load();
+          }
+          if (durationBadge) {
+            durationBadge.textContent = `${formatTime(secondsElapsed)} min`;
+          }
+
+          // Switch UI to preview
+          if (stateRecording) stateRecording.classList.add('hidden');
+          if (stateIdle) stateIdle.classList.add('hidden');
+          if (statePreview) statePreview.classList.remove('hidden');
+
+          checkCanProceed();
+        }
+      };
+
+      mediaRecorder.start(250);
+
+      // Switch UI to recording
+      if (stateIdle) stateIdle.classList.add('hidden');
+      if (statePreview) statePreview.classList.add('hidden');
+      if (stateRecording) stateRecording.classList.remove('hidden');
+
+      recordTimerInterval = setInterval(() => {
+        secondsElapsed++;
+        updateTimer();
+        if (secondsElapsed >= MAX_SECONDS) {
+          stopRecording();
+        }
+      }, 1000);
+    }
+
+    function stopRecording() {
+      clearInterval(recordTimerInterval);
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+    }
+
+    function cancelRecording() {
+      clearInterval(recordTimerInterval);
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+      if (activeStream) {
+        activeStream.getTracks().forEach(t => t.stop());
+        activeStream = null;
+      }
+      audioChunks = [];
+      recordedBlob = null;
+      secondsElapsed = 0;
+      updateTimer();
+
+      if (stateRecording) stateRecording.classList.add('hidden');
+      if (statePreview) statePreview.classList.add('hidden');
+      if (stateIdle) stateIdle.classList.remove('hidden');
+
+      checkCanProceed();
+    }
+
+    function discardAudio() {
+      if (!confirm('¿Descartar este clip y grabar uno nuevo?')) return;
+      recordedBlob = null;
+      if (audioUrlInput) audioUrlInput.value = '';
+      if (audioPlayer) audioPlayer.src = '';
+      if (statePreview) statePreview.classList.add('hidden');
+      if (stateIdle) stateIdle.classList.remove('hidden');
+      checkCanProceed();
+    }
+
+    // Attach listeners
+    btnBigRecord?.addEventListener('click', startRecording);
+    btnStopRec?.addEventListener('click', stopRecording);
+    btnCancelRec?.addEventListener('click', cancelRecording);
+    btnRerecordAudio?.addEventListener('click', startRecording);
+    btnDiscardAudio?.addEventListener('click', discardAudio);
+
+    // Modal confirmation functions
+    window.openConfirmModal = function () {
+      const title = titleInput?.value.trim() || '';
+      if (!title) {
+        showAlert('Introduce un título para tu nota de audio.');
+        titleInput?.focus();
+        return;
+      }
+      if (!recordedBlob && (!audioUrlInput || !audioUrlInput.value)) {
+        showAlert('Graba un clip de audio antes de continuar.');
+        return;
+      }
+
+      if (modalSummaryTitle) modalSummaryTitle.textContent = title;
+      if (modalSummaryDuration) modalSummaryDuration.textContent = `DURACIÓN: ${formatTime(secondsElapsed)} MIN`;
+
+      if (confirmModal) {
+        confirmModal.showModal();
+      }
+    };
+
+    window.closeConfirmModal = function () {
+      if (confirmModal) {
+        confirmModal.close();
+      }
+    };
+
+    // Light-dismiss fallback for <dialog closedby="any">
+    if (confirmModal && !('closedBy' in HTMLDialogElement.prototype)) {
+      confirmModal.addEventListener('click', (event) => {
+        if (event.target !== confirmModal) return;
+        const rect = confirmModal.getBoundingClientRect();
+        const isDialogContent = (
+          rect.top <= event.clientY &&
+          event.clientY <= rect.top + rect.height &&
+          rect.left <= event.clientX &&
+          event.clientX <= rect.left + rect.width
+        );
+        if (!isDialogContent) {
+          confirmModal.close();
+        }
+      });
+    }
+
+    // Execute save/publish
+    window.executeSaveArticle = async function (status) {
+      clearAlert();
+      if (modalLoading) modalLoading.classList.remove('hidden');
+
+      const btnPublish = document.getElementById('btn-confirm-publish');
+      const btnDraft = document.getElementById('btn-confirm-draft');
+      if (btnPublish) btnPublish.disabled = true;
+      if (btnDraft) btnDraft.disabled = true;
+
+      try {
+        let finalAudioUrl = audioUrlInput ? audioUrlInput.value : '';
+
+        // 1. Upload audio blob to storage if not uploaded yet
+        if (recordedBlob) {
+          const formData = new FormData();
+          const ext = recordedBlob.type.includes('mp4') ? 'voice.mp4' : 'voice.webm';
+          formData.append('audio', recordedBlob, ext);
+
+          const uploadRes = await fetch('/api/upload/audio', {
+            method: 'POST',
+            body: formData,
+          });
+
+          const uploadData = await uploadRes.json();
+          if (!uploadRes.ok || !uploadData.audioUrl) {
+            throw new Error(uploadData.error || 'Error al subir el clip de voz al servidor.');
+          }
+
+          finalAudioUrl = uploadData.audioUrl;
+          if (audioUrlInput) audioUrlInput.value = finalAudioUrl;
+          recordedBlob = null;
+        }
+
+        // 2. Create Article with tag: ['audio'] and isAudioOnly: true
+        const payload = {
+          title: titleInput.value.trim(),
+          excerpt: `Nota de voz popular (duración: ${formatTime(secondsElapsed)} min).`,
+          content: `Nota de voz grabada desde el móvil. Escucha el audio completo en el reproductor.`,
+          audioUrl: finalAudioUrl,
+          isAudioOnly: true,
+          tags: ['audio'],
+          status: status,
+        };
+
+        const res = await fetch('/api/articles', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          closeConfirmModal();
+          showAlert(
+            `¡Nota de audio guardada con éxito como ${status === 'published' ? 'PUBLICADA 🚀' : 'BORRADOR 💾'}! Redirigiendo...`,
+            false
+          );
+          setTimeout(() => {
+            window.location.href = status === 'published' ? '/audios' : '/admin/articles';
+          }, 1200);
+        } else {
+          throw new Error(data.error || 'Error al guardar el artículo de audio.');
+        }
+      } catch (err) {
+        console.error('Error guardando nota de audio:', err);
+        closeConfirmModal();
+        showAlert(err.message || 'Error inesperado durante la operación.');
+      } finally {
+        if (modalLoading) modalLoading.classList.add('hidden');
+        if (btnPublish) btnPublish.disabled = false;
+        if (btnDraft) btnDraft.disabled = false;
+      }
+    };
+  })();
+</script>

@@ -24,16 +24,47 @@ const articles = await getArticles({ status: 'published', sortBy: 'blended' });
     </p>
   </div>
 
-  <!-- Barra de Sindicación Popular y Criterio de Ordenación -->
-  <div class="flex items-center justify-between border-b-2 border-black pb-2 mb-6 font-mono text-xs">
-    <div class="flex items-center gap-2">
-      <span class="bg-black text-white font-bold px-1.5 py-0.5 text-[10px]">SINDICACIÓN</span>
-      <span class="font-bold text-black uppercase tracking-tight">Artículos Sindicados</span>
+  <!-- Barra de Sindicación Popular y Criterio de Ordenación con Filtro -->
+  <div class="border-b-2 border-black pb-3 mb-6 font-mono text-xs space-y-2">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <span class="bg-black text-white font-bold px-1.5 py-0.5 text-[10px] rounded">SINDICACIÓN</span>
+        <span class="font-bold text-black uppercase tracking-tight">Artículos Sindicados</span>
+      </div>
+      <div class="text-[11px] text-gray-600 flex items-center gap-1.5">
+        <span class="text-black font-bold">✊🏼 Puño en alto</span>
+        <span class="text-gray-400">|</span>
+        <span>Ordenados por votos y fecha</span>
+      </div>
     </div>
-    <div class="text-[11px] text-gray-600 flex items-center gap-1.5">
-      <span class="text-black font-bold">✊🏼 Puño en alto</span>
-      <span class="text-gray-400">|</span>
-      <span>Ordenados por votos y fecha</span>
+
+    <!-- Filtro de Contenidos (Prensa escrita vs Notas de audio) -->
+    <div class="flex flex-wrap items-center gap-2 pt-1">
+      <span class="text-[11px] font-bold text-gray-600 uppercase">Filtrar:</span>
+      <button
+        type="button"
+        id="filter-all"
+        class="filter-tab-btn active px-2.5 py-1 text-[11px] font-bold border-2 border-black bg-black text-white cursor-pointer rounded-lg shadow-[2px_2px_0px_#000] transition-colors"
+        data-filter="all"
+      >
+        ★ Todo ({articles.length})
+      </button>
+      <button
+        type="button"
+        id="filter-text"
+        class="filter-tab-btn px-2.5 py-1 text-[11px] font-bold border-2 border-black bg-white text-black hover:bg-yellow-100 cursor-pointer rounded-lg shadow-[2px_2px_0px_#000] transition-colors"
+        data-filter="text"
+      >
+        📄 Quitar notas de audio (Solo prensa)
+      </button>
+      <button
+        type="button"
+        id="filter-audio"
+        class="filter-tab-btn px-2.5 py-1 text-[11px] font-bold border-2 border-black bg-white text-black hover:bg-yellow-100 cursor-pointer rounded-lg shadow-[2px_2px_0px_#000] transition-colors"
+        data-filter="audio"
+      >
+        🎙️ Solo notas de audio
+      </button>
     </div>
   </div>
 
@@ -65,3 +96,36 @@ const articles = await getArticles({ status: 'published', sortBy: 'blended' });
     </a>
   </div>
 </Layout>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const filterBtns = document.querySelectorAll('.filter-tab-btn');
+    const cards = document.querySelectorAll<HTMLElement>('.editorial-article');
+
+    filterBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const filter = btn.getAttribute('data-filter');
+        filterBtns.forEach(b => {
+          b.classList.remove('bg-black', 'text-white', 'active');
+          b.classList.add('bg-white', 'text-black');
+        });
+        btn.classList.add('bg-black', 'text-white', 'active');
+        btn.classList.remove('bg-white', 'text-black');
+
+        cards.forEach(card => {
+          const isAudio = card.getAttribute('data-is-audio') === 'true';
+          if (filter === 'text') {
+            // Quitar notas de audio (solo artículos de prensa)
+            card.style.display = isAudio ? 'none' : '';
+          } else if (filter === 'audio') {
+            // Solo notas de audio
+            card.style.display = isAudio ? '' : 'none';
+          } else {
+            // Mostrar todos los contenidos
+            card.style.display = '';
+          }
+        });
+      });
+    });
+  });
+</script>

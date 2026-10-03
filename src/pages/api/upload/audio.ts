@@ -32,7 +32,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       buffer = Buffer.from(arrayBuffer);
     } else {
       // Direct raw binary upload
-      mimeType = contentType || 'audio/webm';
+      mimeType = contentType.split(';')[0].trim() || 'audio/webm';
       const arrayBuffer = await request.arrayBuffer();
       buffer = Buffer.from(arrayBuffer);
     }

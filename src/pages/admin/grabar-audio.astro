@@ -584,7 +584,14 @@ const isAdmin = canPublish(user);
             body: formData,
           });
 
-          const uploadData = await uploadRes.json();
+          let uploadData;
+          const uploadText = await uploadRes.text();
+          try {
+            uploadData = JSON.parse(uploadText);
+          } catch (e) {
+            throw new Error(`Error en el servidor al subir audio (${uploadRes.status}): ${uploadText.substring(0, 120)}`);
+          }
+
           if (!uploadRes.ok || !uploadData.audioUrl) {
             throw new Error(uploadData.error || 'Error al subir el clip de voz al servidor.');
           }
@@ -611,7 +618,14 @@ const isAdmin = canPublish(user);
           body: JSON.stringify(payload),
         });
 
-        const data = await res.json();
+        let data;
+        const resText = await res.text();
+        try {
+          data = JSON.parse(resText);
+        } catch (e) {
+          throw new Error(`Error en el servidor al guardar nota (${res.status}): ${resText.substring(0, 120)}`);
+        }
+
         if (res.ok && data.success) {
           closeConfirmModal();
           showAlert(

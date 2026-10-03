@@ -304,7 +304,14 @@ const { initialAudioUrl = '' } = Astro.props;
           body: formData,
         });
 
-        const data = await res.json();
+        let data;
+        const resText = await res.text();
+        try {
+          data = JSON.parse(resText);
+        } catch (e) {
+          throw new Error(`Error en el servidor al subir audio (${res.status}): ${resText.substring(0, 120)}`);
+        }
+
         if (res.ok && data.audioUrl) {
           if (audioUrlInput) audioUrlInput.value = data.audioUrl;
           recordedBlob = null; // Mark as uploaded

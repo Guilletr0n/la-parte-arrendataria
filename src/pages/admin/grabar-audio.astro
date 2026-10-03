@@ -45,7 +45,7 @@ const isAdmin = canPublish(user);
         <span class="w-2.5 h-2.5 rounded-full bg-red-600 animate-ping"></span>
         <span>Estudio Móvil Inquilino</span>
       </div>
-      <h1 class="text-xl sm:text-2xl font-black font-serif uppercase tracking-tight text-black m-0">
+      <h1 class="text-xl sm:text-2xl font-black font-sans uppercase tracking-tight text-black m-0">
         Nueva Nota de Audio
       </h1>
       <p class="text-xs text-gray-600 mt-1 m-0">
@@ -69,7 +69,7 @@ const isAdmin = canPublish(user);
           name="title"
           required
           maxlength="140"
-          placeholder="Ej: Crónica de la asamblea en Tribulete 7..."
+          placeholder="Ej: Crónica de la asamblea en Las Setas..."
           class="w-full border-2 border-black rounded-xl p-3 text-base font-serif font-bold bg-[#fafafa] focus:bg-yellow-50 focus:outline-none focus:ring-2 focus:ring-black shadow-[2px_2px_0px_#000] transition-colors"
         />
         <div class="flex justify-between items-center mt-1 text-[10px] text-gray-500 font-mono">
@@ -217,7 +217,7 @@ const isAdmin = canPublish(user);
       <div class="flex items-center justify-between pb-3 border-b-2 border-black">
         <div class="flex items-center gap-2">
           <span class="text-xl">🎙️</span>
-          <h2 id="confirm-modal-title" class="font-serif text-lg sm:text-xl font-black uppercase text-black m-0">
+          <h2 id="confirm-modal-title" class="font-sans text-lg sm:text-xl font-black uppercase text-black m-0">
             Confirmar Nota de Audio
           </h2>
         </div>
@@ -234,7 +234,7 @@ const isAdmin = canPublish(user);
       <!-- Resumen de la nota que se va a guardar -->
       <div class="bg-yellow-100 border-2 border-black rounded-xl p-3.5 text-xs space-y-1.5 shadow-[2px_2px_0px_#000]">
         <div class="text-[10px] font-bold text-gray-600 uppercase">Resumen de la publicación:</div>
-        <div class="font-serif font-bold text-sm text-black leading-snug line-clamp-2" id="modal-summary-title">
+        <div class="font-sans font-bold text-sm text-black leading-snug line-clamp-2" id="modal-summary-title">
           -
         </div>
         <div class="flex items-center gap-2 text-[11px] text-gray-700 pt-1">

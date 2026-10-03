@@ -2,12 +2,14 @@
 import '../styles/global.css';
 import VoteModal from '../components/VoteModal.astro';
 import { getSiteUrl, getDomain } from '../lib/config';
+import { getCurrentUser } from '../lib/auth';
 
 interface Props {
   title?: string;
   description?: string;
   maxWidth?: string;
   canonicalPath?: string;
+  isHome?: boolean;
 }
 
 const {
@@ -15,11 +17,14 @@ const {
   description = 'Órgano de contrainformación editorial, derecho a la vivienda y cultura inquilina.',
   maxWidth = 'max-w-[720px]',
   canonicalPath = Astro.url.pathname,
+  isHome = Astro.url.pathname === '/',
 } = Astro.props;
 
 const siteUrl = getSiteUrl();
 const domain = getDomain();
 const canonicalUrl = `${siteUrl}${canonicalPath.startsWith('/') ? canonicalPath : '/' + canonicalPath}`;
+
+const currentUser = await getCurrentUser(Astro.cookies);
 ---
 
 <!doctype html>
@@ -53,12 +58,16 @@ const canonicalUrl = `${siteUrl}${canonicalPath.startsWith('/') ? canonicalPath 
       </div>
       <div class="flex gap-4 items-center">
         <a href="/admin/export-fanzine" class="hover:underline font-bold text-red-700">⚡ IMPRIMIR FANZINE</a>
-        <a href="/admin" class="hover:underline font-bold">PANEL CMS [ADMIN]</a>
+        {currentUser ? (
+          <a href="/admin" class="hover:underline font-bold">DASHBOARD</a>
+        ) : (
+          <a href="/admin/login" class="hover:underline font-bold">REGISTRARSE</a>
+        )}
       </div>
     </nav>
 
     <!-- Main Container: max-w-[720px] for public feed as required -->
-    <main class={`w-full ${maxWidth} flex-1`}>
+    <main class={`w-full ${maxWidth} flex-1 ${isHome ? 'home' : ''}`.trim()}>
       <slot />
     </main>
 

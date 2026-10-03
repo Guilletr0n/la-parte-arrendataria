@@ -28,17 +28,24 @@
   h5,
   h6 {
     text-wrap: balance;
-    font-family: 'Courier New', Courier, monospace, serif;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: -0.02em;
   }
 
   h2 {
-    font-family: 'Times New Roman', Times, serif;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     font-size: 2rem;
     line-height: 2.5rem;
     margin: 2rem 0 1rem 0;
+  }
+
+  /* El título de la Home "ARRENDATARIA" se mantiene en serif según requerimiento */
+  header h1,
+  header h1 a,
+  .home-brand-title {
+    font-family: 'Playfair Display', Georgia, 'Times New Roman', serif !important;
   }
 
   p,
@@ -49,11 +56,11 @@
   }
 }
 
-article a {
+main:not(.home) article a {
   border-bottom: 4px solid #1a1a7d79;
 }
 
-article a:hover {
+main:not(.home) article a:hover {
   border-bottom: 4px solid #3d3dec;
 }
 
@@ -72,7 +79,8 @@ article a:hover {
 }
 
 .brutal-btn {
-  display: inline-block;
+  display: inline-flex;
+  gap: 5px;
   background: #ffffff;
   color: var(--ink-black);
   font-family: 'Courier New', Courier, monospace;
@@ -289,18 +297,33 @@ article a:hover {
 }
 
 .fanzine-article-header h2 {
-  font-size: 1.5rem !important;
-  line-height: 1.15 !important;
-  margin-bottom: 0.4rem !important;
+  font-family: 'Playfair Display', Georgia, serif !important;
+  font-size: 1.15rem !important;
+  line-height: 1.18 !important;
+  margin-bottom: 0.45rem !important;
 }
 
 .fanzine-editorial-flow .prose h2,
 .fanzine-article-block .prose h2 {
-  font-size: 0.95rem !important;
-  line-height: 1.2 !important;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+  font-size: 0.85rem !important;
+  line-height: 1.22 !important;
   margin-top: 0.65rem !important;
-  margin-bottom: 0.3rem !important;
+  margin-bottom: 0.25rem !important;
   font-weight: 900 !important;
+}
+
+/* Titulares en versión web: font family sans-serif (con "ARRENDATARIA" en serif) */
+.editorial-article h2,
+.editorial-article h2 a,
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.audio-article-title,
+.audio-article-title a {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+  letter-spacing: -0.015em;
 }
 
 /* Flujo continuo: el siguiente artículo comienza en la misma columna inmediatamente */
@@ -372,6 +395,306 @@ article a:hover {
 .fanzine-interior-page {
   page-break-before: always !important;
   break-before: page !important;
+}
+
+/* ==========================================================================
+   USABILIDAD MÓVIL Y TABLETS (Pantallas táctiles y dispositivos pequeños)
+   Activado en móviles, tablets (<= 1024px) y dispositivos táctiles (pointer: coarse)
+   ========================================================================== */
+@media screen and (max-width: 1024px),
+screen and (pointer: coarse) {
+
+  /* 1. Botones brutalistas estándar (.brutal-btn) para enlaces y botones:
+        Esquinas siempre redondeadas, más margen alrededor y tamaño táctil mínimo (44px) */
+  .brutal-btn {
+    border-radius: 14px !important;
+    margin-top: 0.45rem !important;
+    margin-bottom: 0.45rem !important;
+    margin-left: 0.25rem !important;
+    margin-right: 0.25rem !important;
+    padding: 0.65rem 1.15rem !important;
+    min-height: 44px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 3px 3px 0px var(--ink-black) !important;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .brutal-btn:hover,
+  .brutal-btn:active {
+    border-radius: 14px !important;
+    transform: translate(1px, 1px) !important;
+    box-shadow: 1px 1px 0px var(--ink-black) !important;
+  }
+
+  /* 2. Enlaces clave de acción que pasan a ser botones táctiles completos
+        (Ej: "Postularse como Editora", "Iniciar Sesión aquí", enlaces secundarios de auth) */
+  a[href="/registro"]:not(nav a),
+  a[href="/admin/login"]:not(nav a),
+  .auth-action-link,
+  .postularse-btn {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    background: #ffffff !important;
+    color: var(--ink-black) !important;
+    border: 2px solid var(--ink-black) !important;
+    border-radius: 14px !important;
+    box-shadow: 3px 3px 0px var(--ink-black) !important;
+    padding: 0.75rem 1.25rem !important;
+    margin: 0.85rem auto !important;
+    min-height: 48px !important;
+    font-family: 'Courier New', Courier, monospace !important;
+    font-weight: 800 !important;
+    text-transform: uppercase !important;
+    text-decoration: none !important;
+    width: 100% !important;
+    max-width: 380px !important;
+    box-sizing: border-box !important;
+    transition: all 0.15s ease-in-out !important;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  a[href="/registro"]:not(nav a):hover,
+  a[href="/registro"]:not(nav a):active,
+  a[href="/admin/login"]:not(nav a):hover,
+  a[href="/admin/login"]:not(nav a):active,
+  .auth-action-link:hover,
+  .auth-action-link:active {
+    background: #fef08a !important;
+    /* bg-yellow-200 */
+    border-radius: 14px !important;
+    transform: translate(1px, 1px) !important;
+    box-shadow: 1px 1px 0px var(--ink-black) !important;
+  }
+
+  /* Si el enlace de registro ya tiene estilo primario (fondo negro en modal) */
+  a.brutal-btn-primary[href="/registro"],
+  a.brutal-btn-primary[href="/admin/login"] {
+    background: var(--ink-black) !important;
+    color: var(--paper-bg) !important;
+  }
+
+  a.brutal-btn-primary[href="/registro"]:hover,
+  a.brutal-btn-primary[href="/admin/login"]:hover,
+  a.brutal-btn-primary[href="/registro"]:active,
+  a.brutal-btn-primary[href="/admin/login"]:active {
+    background: #2a2a2a !important;
+    color: var(--paper-bg) !important;
+  }
+
+  /* 3. Navegación superior (Layout.astro): Enlaces de navegación convertidos en botones táctiles */
+  nav.no-print a {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0.45rem 0.85rem !important;
+    margin: 0.3rem 0.2rem !important;
+    border: 2px solid var(--ink-black) !important;
+    border-radius: 9999px !important;
+    /* Cápsula táctil suave */
+    background: #ffffff !important;
+    box-shadow: 2px 2px 0px var(--ink-black) !important;
+    text-decoration: none !important;
+    min-height: 38px !important;
+    font-size: 0.72rem !important;
+    font-weight: 800 !important;
+    line-height: 1 !important;
+    transition: all 0.15s ease-in-out !important;
+    touch-action: manipulation;
+  }
+
+  nav.no-print a:hover,
+  nav.no-print a:active {
+    background: #fef08a !important;
+    border-radius: 9999px !important;
+    transform: translate(1px, 1px) !important;
+    box-shadow: 1px 1px 0px var(--ink-black) !important;
+  }
+
+  nav.no-print a[href="/admin/export-fanzine"] {
+    background: #fee2e2 !important;
+    /* Fondo suave rojizo */
+    border-color: #991b1b !important;
+    color: #991b1b !important;
+  }
+
+  /* 4. Pestañas de Navegación de Administración (AdminNav.astro) */
+  div:has(> a[href="/admin"]) a,
+  div:has(> a[href="/admin/articles"]) a {
+    border-radius: 12px !important;
+    margin: 0.3rem 0.2rem !important;
+    min-height: 42px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding-left: 0.9rem !important;
+    padding-right: 0.9rem !important;
+  }
+
+  /* 5. Botones de Sindicación Popular y Acciones de Tarjeta (.lpa-vote-btn) */
+  .lpa-vote-btn {
+    border-radius: 14px !important;
+    margin: 0.4rem 0.2rem !important;
+    min-height: 44px !important;
+    padding: 0.6rem 1rem !important;
+    touch-action: manipulation;
+  }
+
+  .lpa-vote-btn .lpa-vote-count {
+    border-radius: 8px !important;
+  }
+
+  .editorial-article .brutal-btn {
+    border-radius: 14px !important;
+    margin: 0.4rem 0.2rem !important;
+    min-height: 44px !important;
+  }
+
+  /* 6. Filtros de Contenido en Portada (.filter-tab-btn) */
+  .filter-tab-btn {
+    border-radius: 12px !important;
+    margin: 0.35rem 0.2rem !important;
+    min-height: 40px !important;
+    padding: 0.5rem 0.9rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    touch-action: manipulation;
+  }
+
+  /* 7. Controles de Playlist de Audios (/audios) */
+  #master-play-btn,
+  #prev-track-btn,
+  #next-track-btn,
+  #mode-toggle-btn,
+  .audio-track-card a.brutal-btn {
+    border-radius: 14px !important;
+    margin: 0.35rem 0.25rem !important;
+    min-height: 44px !important;
+    touch-action: manipulation;
+  }
+
+  /* 8. Botones de Acción en Tablas de Gestión (Admin) */
+  td a.border,
+  td button.border,
+  td .brutal-btn {
+    border-radius: 10px !important;
+    margin: 0.25rem 0.15rem !important;
+    min-height: 38px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0.4rem 0.65rem !important;
+    touch-action: manipulation;
+  }
+
+  /* Barra de sesión superior en el panel admin */
+  .border-2.border-black.bg-white button,
+  .border-2.border-black.bg-white a.hover\:underline {
+    border-radius: 8px !important;
+    margin: 0.2rem !important;
+    padding: 0.35rem 0.6rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+  }
+
+  /* 9. Botones de Paginación (Pagination.astro) */
+  div:has(> a[href*="page="]) a,
+  a[href*="page="],
+  span.border-2.border-gray-300 {
+    border-radius: 10px !important;
+    margin: 0.25rem 0.2rem !important;
+    min-height: 42px !important;
+    min-width: 42px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    touch-action: manipulation;
+  }
+
+  /* 10. Modales y Diálogos de Confirmación (dialog) */
+  dialog .brutal-btn,
+  dialog a.brutal-btn,
+  dialog button.brutal-btn {
+    border-radius: 14px !important;
+    margin: 0.45rem 0 !important;
+    min-height: 46px !important;
+    width: 100% !important;
+    text-align: center !important;
+    justify-content: center !important;
+  }
+
+  /* 11. Botones de Envío en Formularios */
+  button[type="submit"].brutal-btn,
+  #submit-btn {
+    border-radius: 14px !important;
+    margin-top: 0.85rem !important;
+    margin-bottom: 0.85rem !important;
+    min-height: 48px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    touch-action: manipulation;
+  }
+
+  /* 12. Botones rápidos de credenciales en login */
+  button[onclick^="fillCredentials"] {
+    border-radius: 10px !important;
+    margin-top: 0.35rem !important;
+    margin-bottom: 0.35rem !important;
+  }
+
+  /* 13. Text inputs, textareas y selects en dispositivos móviles y tablets:
+         Mayor altura (50px), texto más grande (1.05rem, evita auto-zoom en iOS) y esquinas redondeadas (12px) */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="url"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="number"],
+  input:not([type]) {
+    min-height: 50px !important;
+    font-size: 1.05rem !important;
+    border-radius: 12px !important;
+    padding: 0.7rem 1rem !important;
+    line-height: 1.4 !important;
+    box-sizing: border-box !important;
+  }
+
+  textarea {
+    font-size: 1rem !important;
+    border-radius: 14px !important;
+    padding: 0.85rem 1rem !important;
+    line-height: 1.5 !important;
+    box-sizing: border-box !important;
+  }
+
+  select {
+    min-height: 50px !important;
+    font-size: 1rem !important;
+    border-radius: 12px !important;
+    padding: 0.7rem 1rem !important;
+    box-sizing: border-box !important;
+  }
+
+  input[type="text"]:focus,
+  input[type="email"]:focus,
+  input[type="password"]:focus,
+  input[type="url"]:focus,
+  input[type="search"]:focus,
+  input[type="tel"]:focus,
+  input[type="number"]:focus,
+  input:not([type]):focus,
+  select:focus,
+  textarea:focus {
+    border-radius: 12px !important;
+    box-shadow: 3px 3px 0px var(--ink-black) !important;
+  }
 }
 
 /* Print CSS Styles for 3-Column Layout */

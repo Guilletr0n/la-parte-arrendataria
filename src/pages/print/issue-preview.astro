@@ -215,27 +215,45 @@ const interiorArticlesData = interiorArticles.map(art => {
         word-spacing: normal !important;
       }
 
-      .interior-page-content h1,
-      .interior-page-content h2,
-      .interior-page-content h3,
-      .interior-page-content h4,
-      .interior-page-content h2.article-title {
+      /* Títulos principales de los artículos en el PDF: un poco más grandes y con margen inferior */
+      .interior-page-content h2.article-title,
+      .fanzine-article-header h2.article-title,
+      .fanzine-article-header h2 {
         font-family: 'Playfair Display', Georgia, serif !important;
-        font-size: 9.5pt !important;
+        font-size: 11pt !important;
         font-weight: 900 !important;
         text-transform: uppercase !important;
-        line-height: 1.15 !important;
-        margin: 5px 0 3px 0 !important;
+        line-height: 1.18 !important;
+        margin: 3px 0 6px 0 !important;
         text-align: left !important;
         text-wrap: balance !important;
         word-spacing: normal !important;
+        letter-spacing: -0.01em !important;
+        break-after: avoid !important;
+      }
+
+      /* Subtítulos H2, H3, H4 dentro del cuerpo del artículo: más pequeños y con tipografía sans-serif */
+      .interior-page-content h2:not(.article-title),
+      .interior-page-content h1,
+      .interior-page-content h3,
+      .interior-page-content h4 {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+        font-size: 8.5pt !important;
+        font-weight: 900 !important;
+        text-transform: uppercase !important;
+        line-height: 1.22 !important;
+        margin: 7px 0 2.5px 0 !important;
+        text-align: left !important;
+        text-wrap: balance !important;
+        word-spacing: normal !important;
+        letter-spacing: -0.015em !important;
         break-after: avoid !important;
       }
 
       .fanzine-article-header {
         break-inside: avoid !important;
         break-after: avoid !important;
-        margin-bottom: 4px !important;
+        margin-bottom: 6px !important;
       }
 
       .fanzine-article-header .meta-row {

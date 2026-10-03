@@ -49,6 +49,10 @@
   }
 }
 
+a {
+  border-bottom: 4px solid #1a1a7d;
+}
+
 /* Brutalist Shadows & Utilities */
 .brutal-box {
   background: var(--paper-bg);

@@ -27,7 +27,7 @@ Accede a la redacción desde `http://localhost:4321/admin`:
 
 | Rol | Correo | Contraseña | Capacidades |
 | :--- | :--- | :--- | :--- |
-| **Administrador** | `admin@lapartearrendataria.org` | `admin123` | **Control total**: publicar, despublicar, eliminar artículos, seleccionar contenido para el fanzine físico y exportar el PDF a 3 columnas. |
+| **Administrador** | `arrendataria@zohomail.eu` | `admin123` | **Control total**: publicar, despublicar, eliminar artículos, seleccionar contenido para el fanzine físico y exportar el PDF a 3 columnas. |
 | **Editor** | `editor@lapartearrendataria.org` | `editor123` | **Redacción en borrador**: redactar textos en Markdown, 1 única fotografía por artículo, nota de voz SpeakPipe (máx. 2 min) y enlace a fuente original. |
 
 *(La pantalla de login incluye botones de acceso rápido para probar ambos roles con 1 clic).*

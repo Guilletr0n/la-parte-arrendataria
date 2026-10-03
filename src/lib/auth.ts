@@ -1,6 +1,6 @@
 import type { AstroCookies } from 'astro';
 import type { User, UserRole } from './types';
-import { getUserByEmail } from './users';
+import { getUserByEmail } from './users.ts';
 
 const AUTH_COOKIE_NAME = 'lpa_session_user';
 
@@ -10,21 +10,25 @@ export async function authenticateWithPassword(email: string, pass: string): Pro
   // 1. Look up user in persistent store (Firestore / local JSON)
   const dbUser = await getUserByEmail(cleanEmail);
   if (dbUser) {
-    if (dbUser.password && dbUser.password === pass) {
-      return {
-        uid: dbUser.uid,
-        email: dbUser.email,
-        displayName: dbUser.displayName,
-        role: dbUser.role,
-      };
+    if (dbUser.password) {
+      if (dbUser.password === pass) {
+        return {
+          uid: dbUser.uid,
+          email: dbUser.email,
+          displayName: dbUser.displayName,
+          role: dbUser.role,
+        };
+      }
+      // If password was set on the user record and does not match, reject authentication
+      return null;
     }
   }
 
-  // 2. Fallback to initial credentials for rapid development
-  if (cleanEmail === 'admin@lapartearrendataria.org' && pass === 'admin123') {
+  // 2. Fallback to initial credentials for rapid development / bootstrap
+  if ((cleanEmail === 'arrendataria@zohomail.eu' || cleanEmail === 'admin@lapartearrendataria.org') && pass === 'admin123') {
     return {
       uid: 'user-admin-01',
-      email: 'admin@lapartearrendataria.org',
+      email: 'arrendataria@zohomail.eu',
       displayName: 'Comité Editorial (Admin)',
       role: 'admin',
     };

@@ -55,6 +55,13 @@ allArticles.forEach(a => {
       <span class="text-gray-500">({user.email})</span>
     </div>
     <div class="flex items-center gap-3">
+      <button
+        type="button"
+        onclick="document.getElementById('change-password-modal').showModal()"
+        class="hover:underline font-bold text-black border border-black px-2 py-0.5 bg-yellow-200 hover:bg-yellow-300 transition-colors cursor-pointer"
+      >
+        🔑 Cambiar Contraseña
+      </button>
       <a href="/" target="_blank" class="hover:underline font-bold text-black">Ver Web Pública ↗</a>
       <a href="/api/auth/logout" class="hover:underline text-red-700 font-bold">Cerrar Sesión [x]</a>
     </div>
@@ -90,6 +97,13 @@ allArticles.forEach(a => {
         <a href="/" class="brutal-btn brutal-btn-primary text-xs font-bold py-2 px-4">
           Ir a la Portada a Votar Propuestas ✊🏼
         </a>
+        <button
+          type="button"
+          onclick="document.getElementById('change-password-modal').showModal()"
+          class="brutal-btn bg-yellow-200 hover:bg-yellow-300 text-xs font-bold py-2 px-4"
+        >
+          🔑 Cambiar Contraseña
+        </button>
         <a href="/api/auth/logout" class="brutal-btn bg-white hover:bg-gray-100 text-xs font-bold py-2 px-4">
           Cerrar Sesión
         </a>
@@ -492,6 +506,20 @@ allArticles.forEach(a => {
           </select>
         </div>
 
+        <!-- 4. Contraseña (Opcional) -->
+        <div>
+          <label class="block font-bold uppercase mb-1" for="edit-user-pass">
+            Nueva Contraseña (Opcional):
+          </label>
+          <input
+            type="password"
+            id="edit-user-pass"
+            minlength="6"
+            placeholder="Dejar en blanco para mantener la actual"
+            class="w-full border-2 border-black p-2 bg-[#fdfdfd] focus:outline-none focus:ring-2 focus:ring-black"
+          />
+        </div>
+
         <!-- Botón Rápido: Dejar sin permisos de editora -->
         <div class="pt-1">
           <button
@@ -643,6 +671,94 @@ allArticles.forEach(a => {
     </div>
   </dialog>
 
+  <!-- MODAL: CAMBIAR CONTRASEÑA (Para cualquier usuaria autenticada) -->
+  <dialog
+    id="change-password-modal"
+    class="fixed inset-0 m-auto p-0 border-4 border-black bg-white shadow-[8px_8px_0px_#000] max-w-md w-[92%] backdrop:bg-black/75 z-50 overflow-hidden font-mono"
+  >
+    <div class="p-6 text-black">
+      <div class="flex items-center justify-between border-b-2 border-black pb-3 mb-4">
+        <div>
+          <span class="text-[10px] font-bold uppercase tracking-wider text-red-700 block">
+            SEGURIDAD DE LA CUENTA
+          </span>
+          <h3 class="font-serif text-xl font-black uppercase text-black m-0">
+            Cambiar Contraseña
+          </h3>
+        </div>
+        <button
+          type="button"
+          onclick="document.getElementById('change-password-modal').close()"
+          class="font-black text-lg hover:bg-black hover:text-white px-2 py-0.5 border border-black transition-colors"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div id="change-pass-alert" class="hidden mb-4 p-2 text-xs font-bold border-2"></div>
+
+      <form id="change-password-form" class="space-y-4 text-xs">
+        <div>
+          <label class="block font-bold uppercase mb-1" for="current-password">
+            Contraseña Actual:
+          </label>
+          <input
+            type="password"
+            id="current-password"
+            required
+            placeholder="Introduce tu contraseña actual"
+            class="w-full border-2 border-black p-2 bg-[#fdfdfd] focus:outline-none focus:ring-2 focus:ring-black"
+          />
+        </div>
+
+        <div>
+          <label class="block font-bold uppercase mb-1" for="new-password">
+            Nueva Contraseña (mínimo 6 caracteres):
+          </label>
+          <input
+            type="password"
+            id="new-password"
+            required
+            minlength="6"
+            placeholder="••••••••"
+            class="w-full border-2 border-black p-2 bg-[#fdfdfd] focus:outline-none focus:ring-2 focus:ring-black"
+          />
+        </div>
+
+        <div>
+          <label class="block font-bold uppercase mb-1" for="confirm-new-password">
+            Repite la Nueva Contraseña:
+          </label>
+          <input
+            type="password"
+            id="confirm-new-password"
+            required
+            minlength="6"
+            placeholder="••••••••"
+            class="w-full border-2 border-black p-2 bg-[#fdfdfd] focus:outline-none focus:ring-2 focus:ring-black"
+          />
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t-2 border-black">
+          <button
+            type="button"
+            onclick="document.getElementById('change-password-modal').close()"
+            class="brutal-btn bg-white hover:bg-gray-100 text-xs"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            id="change-pass-submit-btn"
+            class="brutal-btn brutal-btn-primary text-xs font-bold"
+          >
+            Actualizar Contraseña
+          </button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
   <script is:inline>
     // --- Article Actions ---
     async function togglePublish(id, newStatus) {
@@ -702,6 +818,8 @@ allArticles.forEach(a => {
       nameInput.value = userData.displayName;
       emailInput.value = userData.email;
       roleSelect.value = userData.role;
+      const passInput = document.getElementById('edit-user-pass');
+      if (passInput) passInput.value = '';
 
       if (articleCount > 0) {
         countSpan.textContent = articleCount;
@@ -748,17 +866,23 @@ allArticles.forEach(a => {
       const displayName = document.getElementById('edit-user-name').value.trim();
       const email = document.getElementById('edit-user-email').value.trim();
       const role = document.getElementById('edit-user-role').value;
+      const pass = document.getElementById('edit-user-pass')?.value;
       const saveBtn = document.getElementById('save-user-btn');
       const alertBox = document.getElementById('modal-alert');
 
       saveBtn.disabled = true;
       saveBtn.textContent = 'Guardando...';
 
+      const payload = { displayName, email, role };
+      if (pass && pass.trim()) {
+        payload.password = pass.trim();
+      }
+
       try {
         const res = await fetch(`/api/users/${uid}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ displayName, email, role }),
+          body: JSON.stringify(payload),
         });
 
         const data = await res.json();
@@ -874,6 +998,60 @@ allArticles.forEach(a => {
         alertBox.classList.remove('hidden');
         submitBtn.disabled = false;
         submitBtn.textContent = '+ Crear Usuaria';
+      }
+    });
+
+    // Change Password Form
+    document.getElementById('change-password-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const currentPassword = document.getElementById('current-password').value;
+      const newPassword = document.getElementById('new-password').value;
+      const confirmPassword = document.getElementById('confirm-new-password').value;
+      const submitBtn = document.getElementById('change-pass-submit-btn');
+      const alertBox = document.getElementById('change-pass-alert');
+
+      if (newPassword !== confirmPassword) {
+        alertBox.textContent = 'Las contraseñas no coinciden.';
+        alertBox.className = 'mb-4 p-2 text-xs font-bold border-2 bg-red-100 border-red-700 text-red-900';
+        alertBox.classList.remove('hidden');
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Actualizando...';
+
+      try {
+        const res = await fetch('/api/auth/change-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ currentPassword, newPassword, confirmPassword }),
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          alertBox.textContent = '¡Contraseña actualizada con éxito!';
+          alertBox.className = 'mb-4 p-2 text-xs font-bold border-2 bg-green-100 border-green-700 text-green-900';
+          alertBox.classList.remove('hidden');
+          setTimeout(() => {
+            document.getElementById('change-password-modal').close();
+            document.getElementById('change-password-form').reset();
+            alertBox.classList.add('hidden');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Actualizar Contraseña';
+          }, 1500);
+        } else {
+          alertBox.textContent = data.error || 'Error al cambiar la contraseña';
+          alertBox.className = 'mb-4 p-2 text-xs font-bold border-2 bg-red-100 border-red-700 text-red-900';
+          alertBox.classList.remove('hidden');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Actualizar Contraseña';
+        }
+      } catch (err) {
+        alertBox.textContent = 'Error de conexión con el servidor.';
+        alertBox.className = 'mb-4 p-2 text-xs font-bold border-2 bg-red-100 border-red-700 text-red-900';
+        alertBox.classList.remove('hidden');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Actualizar Contraseña';
       }
     });
   </script>

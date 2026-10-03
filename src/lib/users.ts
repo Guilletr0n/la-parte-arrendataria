@@ -43,7 +43,7 @@ const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const INITIAL_USERS: User[] = [
   {
     uid: 'user-admin-01',
-    email: 'admin@lapartearrendataria.org',
+    email: 'arrendataria@zohomail.eu',
     displayName: 'Comité Editorial (Admin)',
     role: 'admin',
     password: 'admin123',
